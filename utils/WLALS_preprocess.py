@@ -5,8 +5,6 @@ import pandas as pd
 
 FPS = 25 # default for all WLASL files
 
-os.chdir('C:/Users/micha/OneDrive/Skrivebord/bachelor_start/WLASL-master/start_kit')
-
 with open('missing.txt', 'r') as f:
     lines = f.readlines()
 print(f'n missing files: {len(lines)}')

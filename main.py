@@ -7,7 +7,7 @@ weight_filename = 'S3D_kinetics400.pt'
 
 def load_model_weights(n_classes):
     model = S3D(n_classes)
-    weights = torch.load(weight_filename)
+    weights = torch.load(os.path.join('weights', weight_filename))
     sd = model.state_dict()
 
     for name, param in weights.items():
