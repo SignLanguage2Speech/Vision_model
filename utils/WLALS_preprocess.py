@@ -5,11 +5,9 @@ import pandas as pd
 
 FPS = 25 # default for all WLASL files
 
-with open('missing.txt', 'r') as f:
-    lines = f.readlines()
-print(f'n missing files: {len(lines)}')
 
 def convertDataFormat(filename='WLASL_v0.3.json', save=False):
+    os.chdir(os.path.join(os.getcwd(), 'data/WLASL'))
     file = open(filename)
     data = json.load(file)
     data_dict = {'gloss': [],
@@ -45,7 +43,7 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
 
     try:
         if os.path.exists(output_path):
-            if not os.path.exists(os.path.join(output_path, 'image_0001.jpg')):
+            if not os.path.exists(os.path.join(output_path, 'image_00001.jpg')):
                 subprocess.call(f'del {output_path}', shell=True)
                 print(f"removed existing instance of {output_path} and created new empty folder...")
                 #os.mkdir(output_path)
@@ -54,16 +52,17 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
         else:
             os.mkdir(output_path)
     
-    except Exception as e: 
+    except Exception as e:
+        print(e)
         print(output_path)
         return
 
     # if gloss is contained in entire video..
     if start == 1 and end == -1:
         if not lower_quality:
-            cmd = f'ffmpeg -i {input_path} -threads 1 -r {fps} -vf scale=-1:331 -qscale:v 0 {output_path}/img_%04d.jpg'
+            cmd = f'ffmpeg -i {input_path} -threads 1 -r {fps} -vf scale=-1:331 -qscale:v 0 {output_path}/img_%05d.jpg'
         else:
-            cmd = f'ffmpeg -i {input_path} -threads 1 -r {fps} -vf scale=-1:331 {output_path}/img_%04d.jpg'
+            cmd = f'ffmpeg -i {input_path} -threads 1 -r {fps} -vf scale=-1:331 {output_path}/img_%05d.jpg'
     else:
         print("Cropping not implemented because labels seem wrong....")
     # call cmd
@@ -72,15 +71,25 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
 
 if __name__ == '__main__':
     # create dataframe of labels, ids, etc...
-    df = convertDataFormat() #save=True)
+    df = convertDataFormat(save=False)
+    print(df.head(5))
 
     # get images from videos...
-    os.chdir('C:/Users/micha/OneDrive/Skrivebord/bachelor_start/data')
-    input_dir = 'WLASL_crop_test'
-    output_dir = 'WLASL_img_test3'
+    os.chdir('C:/Users/micha/OneDrive/Skrivebord/Vision_model/data/WLASL')
+    input_dir = 'WLASL_videos'
+    output_dir = 'WLASL_images'
     video_names = os.listdir(os.path.join(os.getcwd(), input_dir))
+    print("converting videos to images...")
+    #for name in video_names:
+    #   video2jpg(name, input_dir, output_dir)
+    
+    ### find and show what videos are missing in the df that are in the videos folder...
+    vids = list(df['video_id'])
+    vids = [e+'.mp4' for e in vids]
     for name in video_names:
-        video2jpg(name, input_dir, output_dir)
+        if name not in vids:
+            print(name)
+
 
     
    
