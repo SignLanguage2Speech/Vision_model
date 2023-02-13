@@ -15,7 +15,7 @@ def load_model_weights(model, weight_filename = 'S3D_kinetics400.pt'):
             if param.size() == sd[name].size():
                 sd[name].copy_(param)
             else:
-                print(f"name: {name}\npre-trained size {param.size()}\nInit size: {sd[name].size()}")
+                print(f"Dimensions do not match...\n parameter: {name} has size {param.size()}\n Original size is: {sd[name].size()}")
         else:
             print(f"Param {name} not in state dict")
             
