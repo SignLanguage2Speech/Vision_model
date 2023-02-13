@@ -35,13 +35,13 @@ def revert_transform_rgb(clip):
 
 
 class WLASLDataset(data.Dataset):
-  def __init__(self, df, img_folder, grayscale=False):
+  def __init__(self, df, img_folder, seq_len=None, grayscale=False):
     super().__init__()
     self.df = df
     self.img_folder = img_folder
     self.video_names = os.listdir(self.img_folder)
     self.grayscale = grayscale
-
+    self.seq_len = seq_len
   def __getitem__(self, idx):
     video_path = os.path.join(self.img_folder, self.video_names[idx])
     
@@ -49,6 +49,14 @@ class WLASLDataset(data.Dataset):
       images = transform_gray([np.expand_dims(np.asarray(Image.open(os.path.join(video_path, f)).convert('L')),2) for f in os.listdir(video_path)])
     else:
       images = transform_rgb([np.asarray(Image.open(os.path.join(video_path, f))) for f in os.listdir(video_path)])
+    
+    if self.seq_len is not None:
+
+      if self.seq_len < images.size(2): #upsample to reach seq_len
+        print("not implemented yet...")
+      elif self.seq_len > images.size(2): #downsample to reach seq_len
+        start_idx = np.random.randint(0, images.size(2)-self.seq_len)
+        images = images[:][:][start_idx:]
 
     trg = self.df['gloss'][idx]
     #trg = self.df['label'][idx]
