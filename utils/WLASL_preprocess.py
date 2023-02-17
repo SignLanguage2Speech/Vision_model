@@ -72,27 +72,21 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
 if __name__ == '__main__':
     # create dataframe of labels, ids, etc...
     df = convertDataFormat(save=False)
-    print(df.head(5))
+    #print(df.head(5))
 
     # get images from videos...
-    os.chdir('C:/Users/micha/OneDrive/Skrivebord/Vision_model/data/WLASL')
-    input_dir = 'WLASL_videos'
-    output_dir = 'WLASL_images'
-    video_names = os.listdir(os.path.join(os.getcwd(), input_dir))
-    print("converting videos to images...")
+    #os.chdir('C:/Users/micha/OneDrive/Skrivebord/Vision_model/data/WLASL')
+    #input_dir = 'WLASL_videos'
+    #output_dir = 'WLASL_images'
+    #video_names = os.listdir(os.path.join(os.getcwd(), input_dir))
+    #print("converting videos to images...")
     #for name in video_names:
     #   video2jpg(name, input_dir, output_dir)
     
     ### find and show what videos are missing in the df that are in the videos folder...
-    vids = list(df['video_id'])
-    vids = [e+'.mp4' for e in vids]
-    for name in video_names:
-        if name not in vids:
-            print(name)
-
-
+    #vids = list(df['video_id'])
+    #vids = [e+'.mp4' for e in vids]
+    #for name in video_names:
+    #    if name not in vids:
+    #        print(name)
     
-   
-
-
-

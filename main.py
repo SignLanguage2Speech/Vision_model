@@ -35,8 +35,6 @@ class cfg:
     self.seq_len = 64
     
     
-
-
 def main():
   CFG = cfg()
   ############## load data ##############
@@ -106,5 +104,9 @@ if __name__ == '__main__':
   seq_len = 64
   initial = torch.zeros(1, 3, 30, 333, 333)
 
-  start_idx = np.random.randint(0, seq_len-initial.size(2))
-  print(start_idx)
+  imgs = os.listdir(os.path.join(os.getcwd(), 'data/WLASL/WLASL_images'))
+  os.chdir(os.path.join(os.getcwd(), 'data/WLASL/WLASL_images'))
+  lengths = [len(os.listdir(f)) for f in imgs]
+  #start_idx = np.random.randint(0, seq_len-initial.size(2))
+  print(f"min: {min(lengths)} idx: {np.argmin(lengths)}\nmax: {max(lengths)}")
+#s3d.pytorch
