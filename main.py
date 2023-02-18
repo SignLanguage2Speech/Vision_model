@@ -39,8 +39,8 @@ def main():
   CFG = cfg()
   ############## load data ##############
   df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-  img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_images')
-  WLASL = WLASLDataset(df, img_folder, seq_len=CFG.seq_len, gray_scale=False)
+  img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+  WLASL = WLASLDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
   
   ############## load model ##############
   n_classes = len(set(df['gloss'])) #2000
@@ -100,7 +100,8 @@ def train(model, dataloader, optimizer, criterion, CFG):
 
 
 if __name__ == '__main__':
-  #main()
+  main()
+  """
   seq_len = 64
   initial = torch.zeros(1, 3, 30, 333, 333)
 
@@ -109,4 +110,6 @@ if __name__ == '__main__':
   lengths = [len(os.listdir(f)) for f in imgs]
   #start_idx = np.random.randint(0, seq_len-initial.size(2))
   print(f"min: {min(lengths)} idx: {np.argmin(lengths)}\nmax: {max(lengths)}")
+  """
+  
 #s3d.pytorch

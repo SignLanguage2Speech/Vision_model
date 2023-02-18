@@ -5,21 +5,25 @@ from PIL import Image
 import torch.utils.data as data
 import subprocess
 import shlex
+
 """
 Function that converts List of RGB images to [batch_size x 3 x n_frames x H x W]
 """
 def transform_rgb(snippet):
-  print(f"Number of images being transformed: {len(snippet)}")
-  print(f"Original image size: {snippet[0].shape}")
+  #print(f"Number of images being transformed: {len(snippet)}")
+  #print(f"Original image size: {snippet[0].shape}")
   ''' stack & normalization '''
   snippet = np.concatenate(snippet, axis=-1)
   snippet = torch.from_numpy(snippet).permute(2, 0, 1).contiguous().float()
   snippet = snippet.mul_(2.).sub_(255).div(255)
   out = snippet.view(1,-1,3,snippet.size(1),snippet.size(2)).permute(0,2,1,3,4)
-  print(f"Post transformation size: {out.size()}")
+  #print(f"Post transformation size: {out.size()}")
   #[333, 333, 3] --> [1, 3, 21, 333, 333]
   return out
 
+"""
+Function that converts List of grayscale images to [batch_size x 1 x n_frames x H x W]
+"""
 def transform_gray(snippet):
   #print(f"Number of images being transformed: {len(snippet)}")
   #print(f"Original image size: {snippet[0].shape}")
@@ -31,6 +35,9 @@ def transform_gray(snippet):
   #print(f"Post transformation size: {out.size()}")
   return out
 
+"""
+Function that reverts the changes of transform_rgb and returns an array of size [n_frames x 3 x H x W]
+"""
 def revert_transform_rgb(clip):
   clip = clip.squeeze(0).permute(1, 2, 3, 0)
   clip = clip.contiguous().view(1, -1, clip.size(1), clip.size(2)).squeeze(0)
@@ -39,7 +46,7 @@ def revert_transform_rgb(clip):
   return clip.numpy()
 
 # fps=25 is default for WLASL
-def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL_test/videos'), fps=25):
+def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos'), fps=25):
   H = W = 256 # default dims for WLASL
   name, ext = os.path.splitext(vname)
   video_path = os.path.join(input_dir, vname)
@@ -55,32 +62,12 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL_test/vide
   while True:
     buffer = process.stdout.read(H*W*3)
     if len(buffer) != H*W*3:
-      print(f"dimension mismatch... {len(buffer)}!= {H*W*3}")
       break
     out.append(np.frombuffer(buffer, np.uint8).reshape(H, W, 3))
 
   process.stdout.close()
   process.wait()
-
   return out
-
-"""
-Test up and downsampling frames in __getitem__ next
-"""
-seq_len = 64
-t1 = torch.zeros(1, 3, 20, 256, 256)
-t1_org = t1.detach().clone()
-
-if seq_len > t1.size(2):
-  if seq_len/t1.size(2) > 2:
-    repeats = int(np.floor(seq_len/t1.size(2)) - 1)
-    for _ in range(repeats):
-      t1 = torch.cat((t1, t1_org), dim=2)
-    
-  start_idx = np.random.randint(0, t1_org.size(2) - (seq_len - t1.size(2)))
-  stop_idx = start_idx + (seq_len - t1.size(2))
-  t1 = torch.cat((t1, t1_org[:, :, start_idx:stop_idx]), dim=2)
-  print(t1.size())
 
 
 
@@ -95,11 +82,12 @@ class WLASLDataset(data.Dataset):
     self.seq_len = seq_len
 
   def __getitem__(self, idx):
-    video_path = os.path.join(self.input_dir, self.video_names[idx])
+
     if self.grayscale:
       raise(NotImplementedError)
     else:
-      images = transform_rgb(video_path)
+      ipt = video2array(self.video_names[idx], self.input_dir)
+      images = transform_rgb(ipt)
 
     # Check if we need to upsample
     if self.seq_len > images.size(2): 
@@ -107,16 +95,19 @@ class WLASLDataset(data.Dataset):
       if self.seq_len/images.size(2) > 2: # check if image needs to be duplicated
         repeats = int(np.floor(self.seq_len / images.size(2)) - 1) # number of concats
         for _ in range(repeats):
-          images = images.cat((images, images_org), dim=2) # concatenate images temporally
-      elif self.seq_len > images.size(2):
-        start_idx = np.random.randint(0, images_org.size(2) - (self.seq_len - images.size(2))) # pick a 
+          images = torch.cat((images, images_org), dim=2) # concatenate images temporally
+
+      if self.seq_len > images.size(2):
+        start_idx = np.random.randint(0, images_org.size(2) - (self.seq_len - images.size(2))) 
         stop_idx = start_idx + (self.seq_len - images.size(2))
         images = torch.cat((images, images_org[:, :, start_idx:stop_idx]), dim=2)
+
     
     # Check if we need to downsample
     elif self.seq_len < images.size(2): #downsample to reach seq_len
       start_idx = np.random.randint(0, images.size(2)-self.seq_len)
-      images = images[:, :, start_idx:]
+      stop_idx = start_idx + self.seq_len
+      images = images[:, :, start_idx:stop_idx]
 
     trg = self.df['gloss'][idx]
     #trg = self.df['label'][idx]
@@ -126,7 +117,25 @@ class WLASLDataset(data.Dataset):
     return len(self.video_names)
 
 """
+Tests to make sure the pipeline works with down and upsampling...
 
+import pandas as pd
+df = pd.read_csv('data/WLASL/WLASL_labels.csv')
+img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+img, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
+print("FINAL SHAPE: ", img.size())
+
+img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
+print(f"img2: {img2.size()}")
+"""
+
+
+
+
+
+
+"""
 Old class where images are assumed to be in a folder for __getitem__ instead of being loaded in and converted
 
 class WLASLDataset(data.Dataset):
