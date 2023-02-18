@@ -5,7 +5,6 @@ from PIL import Image
 import torch.utils.data as data
 import subprocess
 import shlex
-
 """
 Function that converts List of RGB images to [batch_size x 3 x n_frames x H x W]
 """
@@ -68,6 +67,22 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL_test/vide
 """
 Test up and downsampling frames in __getitem__ next
 """
+seq_len = 64
+t1 = torch.zeros(1, 3, 20, 256, 256)
+t1_org = t1.detach().clone()
+
+if seq_len > t1.size(2):
+  if seq_len/t1.size(2) > 2:
+    repeats = int(np.floor(seq_len/t1.size(2)) - 1)
+    for _ in range(repeats):
+      t1 = torch.cat((t1, t1_org), dim=2)
+    
+  start_idx = np.random.randint(0, t1_org.size(2) - (seq_len - t1.size(2)))
+  stop_idx = start_idx + (seq_len - t1.size(2))
+  t1 = torch.cat((t1, t1_org[:, :, start_idx:stop_idx]), dim=2)
+  print(t1.size())
+
+
 
 class WLASLDataset(data.Dataset):
 
@@ -87,20 +102,21 @@ class WLASLDataset(data.Dataset):
       images = transform_rgb(video_path)
 
     # Check if we need to upsample
-    if self.seq_len < images.size(2): 
+    if self.seq_len > images.size(2): 
       images_org = images.detach().clone()
       if self.seq_len/images.size(2) > 2: # check if image needs to be duplicated
-        repeats = np.floor(self.seq_len/images.size(2)) 
-        for i in range(repeats):
+        repeats = int(np.floor(self.seq_len / images.size(2)) - 1) # number of concats
+        for _ in range(repeats):
           images = images.cat((images, images_org), dim=2) # concatenate images temporally
-      else:
-        start_idx = np.random.randint(0, images.size(2)-self.seq_len)
-        images = torch.cat((images, images_org[:][:][start_idx:]))
+      elif self.seq_len > images.size(2):
+        start_idx = np.random.randint(0, images_org.size(2) - (self.seq_len - images.size(2))) # pick a 
+        stop_idx = start_idx + (self.seq_len - images.size(2))
+        images = torch.cat((images, images_org[:, :, start_idx:stop_idx]), dim=2)
     
     # Check if we need to downsample
-    elif self.seq_len > images.size(2): #downsample to reach seq_len
+    elif self.seq_len < images.size(2): #downsample to reach seq_len
       start_idx = np.random.randint(0, images.size(2)-self.seq_len)
-      images = images[:][:][start_idx:]
+      images = images[:, :, start_idx:]
 
     trg = self.df['gloss'][idx]
     #trg = self.df['label'][idx]
