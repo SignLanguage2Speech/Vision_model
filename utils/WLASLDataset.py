@@ -114,20 +114,47 @@ class WLASLDataset(data.Dataset):
   def __len__(self):
     return len(self.video_names)
 
-"""
-Tests to make sure the pipeline works with down and upsampling...
+class LeftRightFlip:
+  
+  def transform(self, imgs):
+    p = np.random.uniform(0, 1, size=1)
+    if p < 0.5:
+      # flip all images in video horizontally
+      imgs = [np.flip(e, axis=1) for e in imgs]
+    return imgs
 
+class RandomCrop:
+  def __init__(self):
+    self.H_out = 224
+    self.W_out = 224
+
+  def transform(self, imgs):
+    
+    return imgs
+
+      
+    
 import pandas as pd
 df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
-img, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
-print("FINAL SHAPE: ", img.size())
+img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_images')
+image_names = os.listdir(img_folder)
 
-img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
-print(f"img2: {img2.size()}")
-"""
+img1 = Image.open(os.path.join(img_folder, image_names[0], 'img_00001.jpg'))
+img1_a = np.asarray(img1)
+img1_f = Image.fromarray(np.flip(img1_a, axis=1))
+img1_f.show()
 
+#Tests to make sure the pipeline works with down and upsampling...
+
+#import pandas as pd
+#df = pd.read_csv('data/WLASL/WLASL_labels.csv')
+#img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+#WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+#img, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
+#print("FINAL SHAPE: ", img.size())
+
+#img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
+#print(f"img2: {img2.size()}")
 
 
 
