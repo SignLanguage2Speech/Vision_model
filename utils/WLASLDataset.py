@@ -68,52 +68,7 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   process.wait()
   return out
 
-
-
-class WLASLDataset(data.Dataset):
-
-  def __init__(self, df, input_dir, seq_len=64, grayscale=False):
-    super().__init__()
-    self.df = df
-    self.input_dir = input_dir
-    self.video_names = os.listdir(self.input_dir)
-    self.grayscale = grayscale
-    self.seq_len = seq_len
-
-  def __getitem__(self, idx):
-
-    if self.grayscale:
-      raise(NotImplementedError)
-    else:
-      ipt = video2array(self.video_names[idx], self.input_dir)
-      images = transform_rgb(ipt)
-
-    # Check if we need to upsample
-    if self.seq_len > images.size(2): 
-      images_org = images.detach().clone()
-      if self.seq_len / images.size(2) >= 2: # check if image needs to be duplicated
-        repeats = int(np.floor(self.seq_len / images.size(2)) - 1) # number of concats
-        for _ in range(repeats):
-          images = torch.cat((images, images_org), dim=2) # concatenate images temporally
-      if self.seq_len > images.size(2):
-        start_idx = np.random.randint(0, images_org.size(2) - (self.seq_len - images.size(2))) 
-        stop_idx = start_idx + (self.seq_len - images.size(2))
-        images = torch.cat((images, images_org[:, :, start_idx:stop_idx]), dim=2)
-
-    
-    # Check if we need to downsample
-    elif self.seq_len < images.size(2): #downsample to reach seq_len
-      start_idx = np.random.randint(0, images.size(2)-self.seq_len)
-      stop_idx = start_idx + self.seq_len
-      images = images[:, :, start_idx:stop_idx]
-
-    trg = self.df['gloss'][idx]
-    #trg = self.df['label'][idx]
-    return images, trg
-  
-  def __len__(self):
-    return len(self.video_names)
-
+############# Data augmentation #############
 class LeftRightFlip:
   
   def transform(self, imgs):
@@ -132,29 +87,89 @@ class RandomCrop:
     
     return imgs
 
+def upsample(images, seq_len):
+
+  images_org = images.detach().clone() #create a clone of original input
+  if seq_len / images.size(2) >= 2: # check if image needs to be duplicated
+    repeats = int(np.floor(seq_len / images.size(2)) - 1) # number of concats
+    for _ in range(repeats):
+      images = torch.cat((images, images_org), dim=2) # concatenate images temporally
+  
+  if seq_len > images.size(2):
+    start_idx = np.random.randint(0, images_org.size(2) - (seq_len - images.size(2))) 
+    stop_idx = start_idx + (seq_len - images.size(2))
+    images = torch.cat((images, images_org[:, :, start_idx:stop_idx]), dim=2)
+  
+  return images
+
+
+def downsample(images, seq_len):
+  start_idx = np.random.randint(0, images.size(2) - seq_len)
+  stop_idx = start_idx + seq_len
+  return images[:, :, start_idx:stop_idx]
+
+
+############# Dataset class #############
+class WLASLDataset(data.Dataset):
+
+  def __init__(self, df, input_dir, seq_len=64, grayscale=False):
+    super().__init__()
+    self.df = df
+    self.input_dir = input_dir
+    self.video_names = os.listdir(self.input_dir)
+    self.grayscale = grayscale
+    self.seq_len = seq_len
+
+  def __getitem__(self, idx):
+
+    if self.grayscale:
+      raise(NotImplementedError)
+    else:
+      ipt = video2array(self.video_names[idx], self.input_dir)
+      ipt = LeftRightFlip(ipt) # flip images horizontally wiyh 50% prob
+
+      images = transform_rgb(ipt)
+
+    # Check if we need to upsample
+    if self.seq_len > images.size(2): 
+      images = upsample(images, self.seq_len)
+    
+
+    # Check if we need to downsample
+    elif self.seq_len < images.size(2): #downsample to reach seq_len
+      images = downsample(images, self.seq_len)
+
+    trg = self.df['gloss'][idx]
+    #trg = self.df['label'][idx]
+    return images, trg
+  
+  def __len__(self):
+    return len(self.video_names)
       
     
-import pandas as pd
-df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_images')
-image_names = os.listdir(img_folder)
-
-img1 = Image.open(os.path.join(img_folder, image_names[0], 'img_00001.jpg'))
-img1_a = np.asarray(img1)
-img1_f = Image.fromarray(np.flip(img1_a, axis=1))
-img1_f.show()
-
+"""
 #Tests to make sure the pipeline works with down and upsampling...
 
-#import pandas as pd
-#df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-#img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-#WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
-#img, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
-#print("FINAL SHAPE: ", img.size())
+import pandas as pd
+df = pd.read_csv('data/WLASL/WLASL_labels.csv')
+img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+img, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
+print("FINAL SHAPE: ", img.size())
 
-#img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
-#print(f"img2: {img2.size()}")
+img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
+print(f"img2: {img2.size()}")
+
+
+# Test to make sure flipping works
+img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_images')
+img1 = Image.open(os.path.join(img_folder, '00295/img_00001.jpg'))
+img1_f = Image.fromarray(np.flip((np.asarray(img1), axis=1))
+
+#img1.show() # show original
+img1_f.show() # show flipped
+"""
+
 
 
 
