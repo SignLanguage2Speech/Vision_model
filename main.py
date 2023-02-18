@@ -82,6 +82,8 @@ def train(model, dataloader, optimizer, criterion, CFG):
   model.train()
   start = time.time()
   for i, (ipt, trg) in enumerate(dataloader):
+    print(f"processed images size: {ipt.size()}")
+    """
     trg=trg.cuda()
     ipt_var = torch.autograd.Variable(ipt)
     trg_var = torch.autograd.Variable(trg)
@@ -94,9 +96,10 @@ def train(model, dataloader, optimizer, criterion, CFG):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-
-    if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses)}\nTime: {np.round(start, 2)/60} min")
+    """
+    
+    #if i % CFG.print_freq == 0:
+      #print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses)}\nTime: {np.round(start, 2)/60} min")
 
 
 if __name__ == '__main__':
@@ -111,5 +114,5 @@ if __name__ == '__main__':
   #start_idx = np.random.randint(0, seq_len-initial.size(2))
   print(f"min: {min(lengths)} idx: {np.argmin(lengths)}\nmax: {max(lengths)}")
   """
-  
+  #print(missing)
 #s3d.pytorch

@@ -51,7 +51,6 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   name, ext = os.path.splitext(vname)
   video_path = os.path.join(input_dir, vname)
   out = []
-  print(video_path)
   subprocess.run(shlex.split(f'ffmpeg -y -f lavfi -i testsrc=size={W}x{H}:rate=1 -vcodec libx264 -g 20 -crf 17 -pix_fmt yuv420p -t 6000 {video_path}'), stderr=subprocess.DEVNULL)
   
   # the cmd below creates more frames due to the -qscale:v 0 argument... decide which we want we want to use 
@@ -92,11 +91,10 @@ class WLASLDataset(data.Dataset):
     # Check if we need to upsample
     if self.seq_len > images.size(2): 
       images_org = images.detach().clone()
-      if self.seq_len/images.size(2) > 2: # check if image needs to be duplicated
+      if self.seq_len / images.size(2) >= 2: # check if image needs to be duplicated
         repeats = int(np.floor(self.seq_len / images.size(2)) - 1) # number of concats
         for _ in range(repeats):
           images = torch.cat((images, images_org), dim=2) # concatenate images temporally
-
       if self.seq_len > images.size(2):
         start_idx = np.random.randint(0, images_org.size(2) - (self.seq_len - images.size(2))) 
         stop_idx = start_idx + (self.seq_len - images.size(2))
