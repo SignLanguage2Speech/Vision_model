@@ -72,10 +72,11 @@ def main():
   
   for epoch in range(CFG.start_epoch, CFG.n_epochs):
     # adjust learning rate
-    #adjust_lr(optimizer, CFG.lr_step, epoch)
+    #optimizer = adjust_lr(optimizer, CFG.lr_step, epoch)
+
     # run train loop
     train(model, dataloader, optimizer, criterion, CFG)
-  
+    
 
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []

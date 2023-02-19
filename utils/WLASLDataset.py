@@ -90,8 +90,7 @@ class DataAugmentationTrain:
 
 
 def upsample(images, seq_len):
-
-  images_org = images.detach().clone() #create a clone of original input
+  images_org = images.detach().clone() # create a clone of original input
   if seq_len / images.size(2) >= 2: # check if image needs to be duplicated
     repeats = int(np.floor(seq_len / images.size(2)) - 1) # number of concats
     for _ in range(repeats):
