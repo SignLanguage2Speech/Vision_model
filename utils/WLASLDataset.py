@@ -5,6 +5,7 @@ from PIL import Image
 import torch.utils.data as data
 import subprocess
 import shlex
+import torchvision
 
 """
 Function that converts List of RGB images to [batch_size x 3 x n_frames x H x W]
@@ -69,23 +70,22 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   return out
 
 ############# Data augmentation #############
-class LeftRightFlip:
-  
-  def transform(self, imgs):
-    p = np.random.uniform(0, 1, size=1)
-    if p < 0.5:
-      # flip all images in video horizontally
-      imgs = [np.flip(e, axis=1) for e in imgs]
-    return imgs
-
-class RandomCrop:
+class DataAugmentation:
   def __init__(self):
     self.H_out = 224
     self.W_out = 224
 
-  def transform(self, imgs):
-    
+  def HorizontalFlip(self, imgs):
+    p = np.random.uniform(0, 1, size=1)
+    if p <= 0.5:
+      # flip all images in video horizontally
+      imgs = [np.flip(e, axis=1) for e in imgs]
     return imgs
+
+  def RandomCrop(self, imgs):
+    crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
+    return crop(imgs)
+
 
 def upsample(images, seq_len):
 
@@ -119,21 +119,20 @@ class WLASLDataset(data.Dataset):
     self.video_names = os.listdir(self.input_dir)
     self.grayscale = grayscale
     self.seq_len = seq_len
-
+    self.DataAugmentation = DataAugmentation()
   def __getitem__(self, idx):
 
     if self.grayscale:
       raise(NotImplementedError)
     else:
       ipt = video2array(self.video_names[idx], self.input_dir)
-      ipt = LeftRightFlip(ipt) # flip images horizontally wiyh 50% prob
-
+      ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
       images = transform_rgb(ipt)
-
+      images = self.DataAugmentation.RandomCrop(images)
+  
     # Check if we need to upsample
     if self.seq_len > images.size(2): 
       images = upsample(images, self.seq_len)
-    
 
     # Check if we need to downsample
     elif self.seq_len < images.size(2): #downsample to reach seq_len
@@ -146,7 +145,24 @@ class WLASLDataset(data.Dataset):
   def __len__(self):
     return len(self.video_names)
       
-    
+
+import pandas as pd
+df = pd.read_csv('data/WLASL/WLASL_labels.csv')
+img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+img1, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
+print("FINAL SHAPE: ", img1.size())
+
+img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
+print(f"img2: {img2.size()}")
+
+img1_r = revert_transform_rgb(img1)
+
+imgs1_r = [Image.fromarray(img) for img in img1_r]
+#imgs1_r[0].show()
+#imgs1_r[1].show()
+#imgs1_r[2].show()
+#imgs1_r[3].show()
 """
 #Tests to make sure the pipeline works with down and upsampling...
 
