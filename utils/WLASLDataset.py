@@ -39,12 +39,14 @@ def transform_gray(snippet):
 """
 Function that reverts the changes of transform_rgb and returns an array of size [n_frames x 3 x H x W]
 """
+
 def revert_transform_rgb(clip):
   clip = clip.squeeze(0).permute(1, 2, 3, 0)
   clip = clip.contiguous().view(1, -1, clip.size(1), clip.size(2)).squeeze(0)
   clip = clip.mul_(255).add_(255).div(2)
   clip = clip.view(-1, clip.size(1), clip.size(2), 3)
   return clip.numpy()
+
 
 # fps=25 is default for WLASL
 def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos'), fps=25):
@@ -70,7 +72,7 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   return out
 
 ############# Data augmentation #############
-class DataAugmentation:
+class DataAugmentationTrain:
   def __init__(self):
     self.H_out = 224
     self.W_out = 224
@@ -102,7 +104,6 @@ def upsample(images, seq_len):
   
   return images
 
-
 def downsample(images, seq_len):
   start_idx = np.random.randint(0, images.size(2) - seq_len)
   stop_idx = start_idx + seq_len
@@ -110,7 +111,7 @@ def downsample(images, seq_len):
 
 
 ############# Dataset class #############
-class WLASLDataset(data.Dataset):
+class WLASLTrainDataset(data.Dataset):
 
   def __init__(self, df, input_dir, seq_len=64, grayscale=False):
     super().__init__()
@@ -119,7 +120,8 @@ class WLASLDataset(data.Dataset):
     self.video_names = os.listdir(self.input_dir)
     self.grayscale = grayscale
     self.seq_len = seq_len
-    self.DataAugmentation = DataAugmentation()
+    self.DataAugmentation = DataAugmentationTrain()
+
   def __getitem__(self, idx):
 
     if self.grayscale:
@@ -146,10 +148,13 @@ class WLASLDataset(data.Dataset):
     return len(self.video_names)
       
 
+"""
+
+################# Test up/downsampling, flipping and cropping #################
 import pandas as pd
 df = pd.read_csv('data/WLASL/WLASL_labels.csv')
 img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+WLASL = WLASLTrainDataset(df, img_folder, seq_len=64, grayscale=False)
 img1, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
 print("FINAL SHAPE: ", img1.size())
 
@@ -157,38 +162,8 @@ img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
 print(f"img2: {img2.size()}")
 
 img1_r = revert_transform_rgb(img1)
-
-imgs1_r = [Image.fromarray(img) for img in img1_r]
-#imgs1_r[0].show()
-#imgs1_r[1].show()
-#imgs1_r[2].show()
-#imgs1_r[3].show()
+imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
 """
-#Tests to make sure the pipeline works with down and upsampling...
-
-import pandas as pd
-df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
-img, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
-print("FINAL SHAPE: ", img.size())
-
-img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
-print(f"img2: {img2.size()}")
-
-
-# Test to make sure flipping works
-img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_images')
-img1 = Image.open(os.path.join(img_folder, '00295/img_00001.jpg'))
-img1_f = Image.fromarray(np.flip((np.asarray(img1), axis=1))
-
-#img1.show() # show original
-img1_f.show() # show flipped
-"""
-
-
-
-
 
 
 """
