@@ -17,23 +17,21 @@ def transform_rgb(snippet):
   snippet = np.concatenate(snippet, axis=-1)
   snippet = torch.from_numpy(snippet).permute(2, 0, 1).contiguous().float()
   snippet = snippet.mul_(2.).sub_(255).div(255)
-  out = snippet.view(1,-1,3,snippet.size(1),snippet.size(2)).permute(0,2,1,3,4)
+  out = snippet.view(-1,3,snippet.size(1),snippet.size(2)).permute(1,0,2,3)
   #print(f"Post transformation size: {out.size()}")
   #[333, 333, 3] --> [1, 3, 21, 333, 333]
   return out
 
-"""
-Function that converts List of grayscale images to [batch_size x 1 x n_frames x H x W]
-"""
+
 def transform_gray(snippet):
-  #print(f"Number of images being transformed: {len(snippet)}")
-  #print(f"Original image size: {snippet[0].shape}")
+  print(f"Number of images being transformed: {len(snippet)}")
+  print(f"Original image size: {snippet[0].shape}")
   ''' stack & normalization '''
   snippet = np.concatenate(snippet, axis=-1)
   snippet = torch.from_numpy(snippet).permute(2, 0, 1).contiguous().float()
   snippet = snippet.mul_(2.).sub_(255).div(255)
   out = snippet.view(1,-1,1,snippet.size(1),snippet.size(2)).permute(0,2,1,3,4)
-  #print(f"Post transformation size: {out.size()}")
+  print(f"Post transformation size: {out.size()}")
   return out
 
 """
@@ -41,7 +39,7 @@ Function that reverts the changes of transform_rgb and returns an array of size 
 """
 
 def revert_transform_rgb(clip):
-  clip = clip.squeeze(0).permute(1, 2, 3, 0)
+  clip = clip.permute(1, 2, 3, 0)
   clip = clip.contiguous().view(1, -1, clip.size(1), clip.size(2)).squeeze(0)
   clip = clip.mul_(255).add_(255).div(2)
   clip = clip.view(-1, clip.size(1), clip.size(2), 3)
@@ -96,27 +94,31 @@ class DataAugmentations:
   
   # randomly rotate all images in video with +- 5 degrees.
   def RandomRotation(self, imgs):
-    rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0)
+    rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0.0, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR)
     return rotate(imgs)
 
 def upsample(images, seq_len):
   images_org = images.detach().clone() # create a clone of original input
-  if seq_len / images.size(2) >= 2: # check if image needs to be duplicated
-    repeats = int(np.floor(seq_len / images.size(2)) - 1) # number of concats
+  if seq_len / images.size(1) >= 2: # check if image needs to be duplicated
+    repeats = int(np.floor(seq_len / images.size(1)) - 1) # number of concats
     for _ in range(repeats):
-      images = torch.cat((images, images_org), dim=2) # concatenate images temporally
+      images = torch.cat((images, images_org), dim=1) # concatenate images temporally
   
-  if seq_len > images.size(2):
-    start_idx = np.random.randint(0, images_org.size(2) - (seq_len - images.size(2))) 
-    stop_idx = start_idx + (seq_len - images.size(2))
-    images = torch.cat((images, images_org[:, :, start_idx:stop_idx]), dim=2)
+  if seq_len > images.size(1):
+    start_idx = np.random.randint(0, images_org.size(1) - (seq_len - images.size(1))) 
+    stop_idx = start_idx + (seq_len - images.size(1))
+    images = torch.cat((images, images_org[:, start_idx:stop_idx]), dim=1)
   
   return images
 
+
+
 def downsample(images, seq_len):
-  start_idx = np.random.randint(0, images.size(2) - seq_len)
+  start_idx = np.random.randint(0, images.size(1) - seq_len)
   stop_idx = start_idx + seq_len
-  return images[:, :, start_idx:stop_idx]
+  return images[:, start_idx:stop_idx]
+
+
 
 
 ############# Dataset class #############
@@ -129,13 +131,14 @@ class WLASLDataset(data.Dataset):
     self.video_names = os.listdir(self.input_dir)
     self.grayscale = grayscale
     self.seq_len = seq_len
-    self.DataAugmentation = DataAugmentations
+    self.DataAugmentation = DataAugmentations()
     self.train = train
 
   def __getitem__(self, idx):
 
     if self.grayscale:
       raise(NotImplementedError)
+
     else:
       if self.train:
         ipt = video2array(self.video_names[idx], self.input_dir)
@@ -143,6 +146,7 @@ class WLASLDataset(data.Dataset):
         images = transform_rgb(ipt)
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
         images = self.DataAugmentation.RandomRotation(images) # randomly rotate image +- 5 degrees'
+
       # validation/test dataset
       else:
         ipt = video2array(self.video_names[idx], self.input_dir)
@@ -150,24 +154,23 @@ class WLASLDataset(data.Dataset):
         images = transform_rgb(ipt)
         images = self.DataAugmentation.CenterCrop(images) # center crop 224 x 224
         
-  
     # Check if we need to upsample
-    if self.seq_len > images.size(2): 
+    if self.seq_len > images.size(1): 
       images = upsample(images, self.seq_len)
-
+    
     # Check if we need to downsample
-    elif self.seq_len < images.size(2): #downsample to reach seq_len
+    elif self.seq_len < images.size(1): #downsample to reach seq_len
       images = downsample(images, self.seq_len)
 
     # make a one-hot vector for target class
-    trg = torch.zeros(len(set(self.df['glosses']))) # 2000 unique words
-    trg[self.df['label'[idx]]] = 1
+    trg = torch.zeros(len(set(self.df['gloss']))) # 2000 unique words
+    gloss_idx = self.df.iloc[idx]['label']
+    trg[gloss_idx] = 1
     
     return images, trg
   
   def __len__(self):
-    return len(self.video_names)
-      
+    return len(self.df)
 
 """
 
@@ -184,6 +187,11 @@ print(f"img2: {img2.size()}")
 
 img1_r = revert_transform_rgb(img1)
 imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
+
+imgs1_r[5].show()
+imgs1_r[10].show()
+imgs1_r[15].show()
+imgs1_r[20].show()
 """
 
 

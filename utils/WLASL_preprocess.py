@@ -33,7 +33,7 @@ def convertDataFormat(filename='WLASL_v0.3.json', save=False):
     words = list(sorted(set(words)))
     for i in range(len(data_dict['gloss'])):
         data_dict['label'].append(words.index(data_dict['gloss'][i]))
-
+        
     df = pd.DataFrame.from_dict(data_dict)
     if save:
         df.to_csv('WLASL_labels.csv')
