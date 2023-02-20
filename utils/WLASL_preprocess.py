@@ -80,8 +80,11 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
 if __name__ == '__main__':
     # create dataframe of labels, ids, etc...
     df = convertDataFormat(save=False)
-    print(df['label'][15:50])
-    #print(df.head(5))
+    #print(df['gloss'][30], df['label'][30])
+    #print(df['gloss'][45], df['label'][45])
+    df_train = df.loc[df['split'] == 'train']
+    print(len(df))
+    print(len(df_train))
 
     # get images from videos...
     #os.chdir('C:/Users/micha/OneDrive/Skrivebord/Vision_model/data/WLASL')

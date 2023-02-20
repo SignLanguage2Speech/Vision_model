@@ -77,21 +77,24 @@ class DataAugmentations:
     self.H_out = 224
     self.W_out = 224
 
+  # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
     p = np.random.randint(0, 2)
     if p == 0:
-      # flip all images in video horizontally
       imgs = [np.flip(e, axis=1) for e in imgs]
     return imgs
-
+  
+  # random 224 x 224 crop (same crop for all images in video)
   def RandomCrop(self, imgs):
     crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
     return crop(imgs)
   
+  # 224 x 224 center crop (all images in video)
   def CenterCrop(self, imgs):
     crop = torchvision.transforms.CenterCrop((self.H_out, self.W_out))
     return crop(imgs)
   
+  # randomly rotate all images in video with +- 5 degrees.
   def RandomRotation(self, imgs):
     rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0)
     return rotate(imgs)
@@ -139,6 +142,8 @@ class WLASLDataset(data.Dataset):
         ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
         images = transform_rgb(ipt)
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
+        images = self.DataAugmentation.RandomRotation(images) # randomly rotate image +- 5 degrees'
+      # validation/test dataset
       else:
         ipt = video2array(self.video_names[idx], self.input_dir)
         ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
@@ -154,8 +159,10 @@ class WLASLDataset(data.Dataset):
     elif self.seq_len < images.size(2): #downsample to reach seq_len
       images = downsample(images, self.seq_len)
 
-    trg = self.df['gloss'][idx]
-    #trg = self.df['label'][idx]
+    # make a one-hot vector for target class
+    trg = torch.zeros(len(set(self.df['glosses']))) # 2000 unique words
+    trg[self.df['label'[idx]]] = 1
+    
     return images, trg
   
   def __len__(self):

@@ -40,8 +40,12 @@ def main():
   ############## load data ##############
   df = pd.read_csv('data/WLASL/WLASL_labels.csv')
   img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-  WLASL = WLASLDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
-  
+
+  # Get datasets
+  WLASLtrain = WLASLDataset(df.loc[df['split']=='train'], img_folder, seq_len=CFG.seq_len,train=True, grayscale=False)
+  WLASLval = WLASLDataset(df.loc[df['split']=='val'], img_folder, seq_len=CFG.seq_len, train=False, grayscale=False)
+  WLASLtest = WLASLDataset(df.loc[df['split']=='test'], img_folder, seq_len=CFG.seq_len, train=False, grayscale=False)
+
   ############## load model ##############
   n_classes = len(set(df['gloss'])) #2000
   model = S3D(n_classes)
@@ -50,7 +54,7 @@ def main():
 
   ############## initialize dataloader ##############
   if CFG.multipleGPUs:
-    dataloader = DataLoader(WLASL, batch_size=CFG.batch_size, 
+    dataloaderTrain = DataLoader(WLASLtrain, batch_size=CFG.batch_size, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers,
                                    pin_memory=True)
@@ -59,7 +63,13 @@ def main():
   else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
-    dataloader = DataLoader(WLASL, batch_size=CFG.batch_size, 
+    dataloaderTrain = DataLoader(WLASLtrain, batch_size=CFG.batch_size, 
+                                   shuffle=True,
+                                   num_workers=CFG.num_workers)
+    dataloaderVal = DataLoader(WLASLval, batch_size=CFG.batch_size, 
+                                   shuffle=True,
+                                   num_workers=CFG.num_workers)
+    dataloaderVal = DataLoader(WLASLtest, batch_size=CFG.batch_size, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
     model.cuda()                   
@@ -75,8 +85,10 @@ def main():
     #optimizer = adjust_lr(optimizer, CFG.lr_step, epoch)
 
     # run train loop
-    train(model, dataloader, optimizer, criterion, CFG)
+    train(model, dataloaderTrain, optimizer, criterion, CFG)
     
+    # run validation loop
+
 
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
@@ -102,8 +114,14 @@ def train(model, dataloader, optimizer, criterion, CFG):
     #if i % CFG.print_freq == 0:
       #print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses)}\nTime: {np.round(start, 2)/60} min")
 
-def adjust_lr(optimizer, cfg):
+def validate(model, dataloader, criterion, CFG):
   
+  losses = []
+  model.eval()
+  
+  return losses
+def adjust_lr(optimizer, cfg):
+
   return None
 
 if __name__ == '__main__':
