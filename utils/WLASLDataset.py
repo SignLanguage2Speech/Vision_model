@@ -78,8 +78,8 @@ class DataAugmentationTrain:
     self.W_out = 224
 
   def HorizontalFlip(self, imgs):
-    p = np.random.uniform(0, 1, size=1)
-    if p <= 0.5:
+    p = np.random.randint(0, 2)
+    if p == 0:
       # flip all images in video horizontally
       imgs = [np.flip(e, axis=1) for e in imgs]
     return imgs
@@ -87,6 +87,10 @@ class DataAugmentationTrain:
   def RandomCrop(self, imgs):
     crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
     return crop(imgs)
+
+  def RandomRotation(self, imgs):
+    rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0)
+    return rotate(imgs)
 
 
 def upsample(images, seq_len):
