@@ -91,10 +91,10 @@ class DataAugmentations:
   def CenterCrop(self, imgs):
     crop = torchvision.transforms.CenterCrop((self.H_out, self.W_out))
     return crop(imgs)
-
   
-
-  
+  def RandomRotation(self, imgs):
+    rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0)
+    return rotate(imgs)
 
 def upsample(images, seq_len):
   images_org = images.detach().clone() # create a clone of original input
