@@ -72,14 +72,14 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   return out
 
 ############# Data augmentation #############
-class DataAugmentationTrain:
+class DataAugmentations:
   def __init__(self):
     self.H_out = 224
     self.W_out = 224
 
   def HorizontalFlip(self, imgs):
-    p = np.random.uniform(0, 1, size=1)
-    if p <= 0.5:
+    p = np.random.randint(0, 2)
+    if p == 0:
       # flip all images in video horizontally
       imgs = [np.flip(e, axis=1) for e in imgs]
     return imgs
@@ -87,7 +87,14 @@ class DataAugmentationTrain:
   def RandomCrop(self, imgs):
     crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
     return crop(imgs)
+  
+  def CenterCrop(self, imgs):
+    crop = torchvision.transforms.CenterCrop((self.H_out, self.W_out))
+    return crop(imgs)
 
+  
+
+  
 
 def upsample(images, seq_len):
   images_org = images.detach().clone() # create a clone of original input
@@ -110,26 +117,34 @@ def downsample(images, seq_len):
 
 
 ############# Dataset class #############
-class WLASLTrainDataset(data.Dataset):
+class WLASLDataset(data.Dataset):
 
-  def __init__(self, df, input_dir, seq_len=64, grayscale=False):
+  def __init__(self, df, input_dir, seq_len=64,train=True, grayscale=False):
     super().__init__()
     self.df = df
     self.input_dir = input_dir
     self.video_names = os.listdir(self.input_dir)
     self.grayscale = grayscale
     self.seq_len = seq_len
-    self.DataAugmentation = DataAugmentationTrain()
+    self.DataAugmentation = DataAugmentations
+    self.train = train
 
   def __getitem__(self, idx):
 
     if self.grayscale:
       raise(NotImplementedError)
     else:
-      ipt = video2array(self.video_names[idx], self.input_dir)
-      ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
-      images = transform_rgb(ipt)
-      images = self.DataAugmentation.RandomCrop(images)
+      if self.train:
+        ipt = video2array(self.video_names[idx], self.input_dir)
+        ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
+        images = transform_rgb(ipt)
+        images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
+      else:
+        ipt = video2array(self.video_names[idx], self.input_dir)
+        ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
+        images = transform_rgb(ipt)
+        images = self.DataAugmentation.CenterCrop(images) # center crop 224 x 224
+        
   
     # Check if we need to upsample
     if self.seq_len > images.size(2): 

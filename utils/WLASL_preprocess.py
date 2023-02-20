@@ -2,7 +2,7 @@ import os
 import json
 import subprocess
 import pandas as pd
-
+import numpy as np
 FPS = 25 # default for all WLASL files
 
 
@@ -11,12 +11,14 @@ def convertDataFormat(filename='WLASL_v0.3.json', save=False):
     file = open(filename)
     data = json.load(file)
     data_dict = {'gloss': [],
+                 'label':[],
                  'video_id': [],
                  'split':[],
                  'frame_start': [],
                  'frame_end': [],
-                 'fps':[]}         
-    # get relevant data             
+                 'fps':[]}  
+           
+    # get relevant data         
     for dictionary in data:
         for obs in dictionary['instances']:
             data_dict['gloss'].append(dictionary['gloss'])
@@ -25,6 +27,12 @@ def convertDataFormat(filename='WLASL_v0.3.json', save=False):
             data_dict['frame_start'].append(obs['frame_start'])
             data_dict['frame_end'].append(obs['frame_end'])
             data_dict['fps'].append(obs['fps'])
+
+    # get labels
+    words = data_dict['gloss']
+    words = list(sorted(set(words)))
+    for i in range(len(data_dict['gloss'])):
+        data_dict['label'].append(words.index(data_dict['gloss'][i]))
 
     df = pd.DataFrame.from_dict(data_dict)
     if save:
@@ -72,21 +80,22 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
 if __name__ == '__main__':
     # create dataframe of labels, ids, etc...
     df = convertDataFormat(save=False)
+    print(df['label'][15:50])
     #print(df.head(5))
 
     # get images from videos...
     #os.chdir('C:/Users/micha/OneDrive/Skrivebord/Vision_model/data/WLASL')
-    input_dir = 'WLASL_videos'
+    #input_dir = 'WLASL_videos'
     #output_dir = 'WLASL_images'
-    video_names = os.listdir(os.path.join(os.getcwd(), input_dir))
+    #video_names = os.listdir(os.path.join(os.getcwd(), input_dir))
     #print("converting videos to images...")
     #for name in video_names:
     #   video2jpg(name, input_dir, output_dir)
     
     ### find and show what videos are missing in the df that are in the videos folder...
-    vids = list(df['video_id'])
-    vids = [e+'.mp4' for e in vids]
-    for name in video_names:
-        if name not in vids:
-            print(name)
+    #vids = list(df['video_id'])
+    #vids = [e+'.mp4' for e in vids]
+    #for name in video_names:
+    #    if name not in vids:
+    #        print(name)
     

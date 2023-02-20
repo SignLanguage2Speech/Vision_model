@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from utils.WLASLDataset import WLASLTrainDataset
+from utils.WLASLDataset import WLASLDataset
 from model import S3D
 from utils.load_weigths import load_model_weights
 
@@ -40,7 +40,7 @@ def main():
   ############## load data ##############
   df = pd.read_csv('data/WLASL/WLASL_labels.csv')
   img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-  WLASL = WLASLTrainDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
+  WLASL = WLASLDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
   
   ############## load model ##############
   n_classes = len(set(df['gloss'])) #2000
@@ -102,6 +102,9 @@ def train(model, dataloader, optimizer, criterion, CFG):
     #if i % CFG.print_freq == 0:
       #print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses)}\nTime: {np.round(start, 2)/60} min")
 
+def adjust_lr(optimizer, cfg):
+  
+  return None
 
 if __name__ == '__main__':
   main()
