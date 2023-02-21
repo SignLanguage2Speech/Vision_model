@@ -17,6 +17,12 @@ from utils.load_weigths import load_model_weights
 #subprocess.call('pip list')
 ### opencv-python is here but cv2 gives importerror...
 
+# stores directory paths for data on HPC
+class DataPaths:
+  def __init__(self):
+    self.wlasl_videos = "/work3/s204503/bach-data/WLASL/WLASL2000"
+    self.wlasl_labels = "/work3/s204503/bach-data/WLASL/WLASL_labels.csv" # ! not to be found
+
 
 class cfg:
   def __init__(self):
@@ -36,10 +42,13 @@ class cfg:
     
     
 def main():
+  dp = DataPaths() # DATA PATHS
   CFG = cfg()
   ############## load data ##############
-  df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-  img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+  # df = pd.read_csv('data/WLASL/WLASL_labels.csv')
+  # img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
+  df = pd.read_csv(dp.wlasl_labels)
+  img_folder = dp.wlasl_videos
   WLASL = WLASLTrainDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
   
   ############## load model ##############
