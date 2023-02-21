@@ -12,7 +12,7 @@ def convertDataFormat(filename='WLASL_v0.3.json', save=False):
     os.chdir(os.path.join(wlasl_wd))   # path to .json file | for HPC scratch (s204503)
     file = open(filename)
     data = json.load(file)
-    os.chdir(os.path.join(wlasl_wd, 'WLASL2000'))   # path to .mp4-files | for HPC scratch (s204503)
+    # os.chdir(os.path.join(wlasl_wd, 'WLASL2000'))   # path to .mp4-files | for HPC scratch (s204503)
     data_dict = {'gloss': [],
                  'label':[],
                  'video_id': [],

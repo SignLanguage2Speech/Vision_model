@@ -16,7 +16,7 @@ def transform_rgb(snippet):
   #print(f"Number of images being transformed: {len(snippet)}")
   #print(f"Original image size: {snippet[0].shape}")
   ''' stack & normalization '''
-  pdb.set_trace()
+  # pdb.set_trace()
   snippet = np.concatenate(snippet, axis=-1) # freezes on HPC?
   snippet = torch.from_numpy(snippet).permute(2, 0, 1).contiguous().float()
   snippet = snippet.mul_(2.).sub_(255).div(255)
@@ -161,6 +161,7 @@ class WLASLDataset(data.Dataset):
     elif self.seq_len < images.size(1): #downsample to reach seq_len
       images = downsample(images, self.seq_len)
 
+    # pdb.set_trace()
     # make a one-hot vector for target class
     trg = torch.zeros(len(set(self.df['gloss']))) # 2000 unique words
     gloss_idx = self.df.iloc[idx]['label']
