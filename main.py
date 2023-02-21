@@ -13,6 +13,8 @@ from model import S3D
 from utils.load_weigths import load_model_weights
 
 
+import pdb
+
 #import subprocess
 #subprocess.call('pip list')
 ### opencv-python is here but cv2 gives importerror...
@@ -35,7 +37,7 @@ class cfg:
     self.lr = 0.1
     self.momentum = 0.9
     self.weight_decay = 5e-4
-    self.num_workers = 4
+    self.num_workers = 1
     self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
@@ -51,7 +53,7 @@ def main():
   # img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
   df = pd.read_csv(dp.wlasl_labels)
   img_folder = dp.wlasl_videos
-  WLASL = WLASLTrainDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
+  # WLASL = WLASLDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
   
   # Get datasets
   WLASLtrain = WLASLDataset(df.loc[df['split']=='train'], img_folder, seq_len=CFG.seq_len,train=True, grayscale=False)
@@ -103,6 +105,8 @@ def main():
   
   train_losses = []
   val_losses = []
+
+  pdb.set_trace()
 
   for epoch in range(CFG.start_epoch, CFG.n_epochs):
     # adjust learning rate
