@@ -97,7 +97,7 @@ def main():
   for epoch in range(CFG.start_epoch, CFG.n_epochs):
     # adjust learning rate
     if len(train_losses) > 0:
-      if np.mean(train_loss) - np.mean(val_loss) < CFG.epsilon:
+      if np.abs(np.mean(train_loss) - np.mean(val_loss)) < CFG.epsilon:
         adjust_lr(optimizer, CFG.lr_step, epoch)
 
     # run train loop
@@ -200,13 +200,3 @@ def load_checkpoint(path, model, optimizer):
 
 if __name__ == '__main__':
   main()
-  """
-  seq_len = 64
-  initial = torch.zeros(1, 3, 30, 333, 333)
-
-  imgs = os.listdir(os.path.join(os.getcwd(), 'data/WLASL/WLASL_images'))
-  os.chdir(os.path.join(os.getcwd(), 'data/WLASL/WLASL_images'))
-  lengths = [len(os.listdir(f)) for f in imgs]
-  #start_idx = np.random.randint(0, seq_len-initial.size(2))
-  print(f"min: {min(lengths)} idx: {np.argmin(lengths)}\nmax: {max(lengths)}")
-  """
