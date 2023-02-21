@@ -5,11 +5,14 @@ import pandas as pd
 import numpy as np
 FPS = 25 # default for all WLASL files
 
+wlasl_wd = '/work3/s204503/bach-data/WLASL'
 
 def convertDataFormat(filename='WLASL_v0.3.json', save=False):
-    os.chdir(os.path.join(os.getcwd(), 'data/WLASL'))
+    # os.chdir(os.path.join(os.getcwd(), 'data/WLASL')) # original
+    os.chdir(os.path.join(wlasl_wd))   # path to .json file | for HPC scratch (s204503)
     file = open(filename)
     data = json.load(file)
+    os.chdir(os.path.join(wlasl_wd, 'WLASL2000'))   # path to .mp4-files | for HPC scratch (s204503)
     data_dict = {'gloss': [],
                  'label':[],
                  'video_id': [],
@@ -41,7 +44,6 @@ def convertDataFormat(filename='WLASL_v0.3.json', save=False):
     return df
 
 def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_quality=False):
-
     if '.mp4' not in vname:
         return
     
@@ -79,9 +81,16 @@ def video2jpg(vname, input_dir, output_dir, fps=FPS, start=1, end=-1, lower_qual
 
 if __name__ == '__main__':
     # create dataframe of labels, ids, etc...
-    df = convertDataFormat(save=False)
-    #print(df['gloss'][30], df['label'][30])
-    #print(df['gloss'][45], df['label'][45])
+    df = convertDataFormat(save=True)
+    #print(df.head(5))
+
+    # get images from videos...
+    #os.chdir('C:/Users/micha/OneDrive/Skrivebord/Vision_model/data/WLASL')
+    # input_dir = 'WLASL_videos'
+    input_dir = '' # HPC
+    #output_dir = 'WLASL_images'
+    # video_names = os.listdir(os.path.join(os.getcwd(), input_dir)) # original
+    video_names = os.listdir(os.path.join(wlasl_wd, input_dir))   # for HPC scratch (s204503)
     df_train = df.loc[df['split'] == 'train']
     
 
