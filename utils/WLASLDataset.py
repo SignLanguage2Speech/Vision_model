@@ -7,6 +7,8 @@ import subprocess
 import shlex
 import torchvision
 
+import pdb
+
 """
 Function that converts List of RGB images to [batch_size x 3 x n_frames x H x W]
 """
@@ -14,7 +16,8 @@ def transform_rgb(snippet):
   #print(f"Number of images being transformed: {len(snippet)}")
   #print(f"Original image size: {snippet[0].shape}")
   ''' stack & normalization '''
-  snippet = np.concatenate(snippet, axis=-1)
+  pdb.set_trace()
+  snippet = np.concatenate(snippet, axis=-1) # freezes on HPC?
   snippet = torch.from_numpy(snippet).permute(2, 0, 1).contiguous().float()
   snippet = snippet.mul_(2.).sub_(255).div(255)
   out = snippet.view(-1,3,snippet.size(1),snippet.size(2)).permute(1,0,2,3)
@@ -52,21 +55,17 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   name, ext = os.path.splitext(vname)
   video_path = os.path.join(input_dir, vname)
   out = []
-  subprocess.run(shlex.split(f'ffmpeg -y -f lavfi -i testsrc=size={W}x{H}:rate=1 -vcodec libx264 -g 20 -crf 17 -pix_fmt yuv420p -t 6000 {video_path}'), stderr=subprocess.DEVNULL)
-  
-  # the cmd below creates more frames due to the -qscale:v 0 argument... decide which we want we want to use 
-  #cmd = f'ffmpeg -i {video_path} -f rawvideo -pix_fmt bgr24 -threads 1 -r {fps} -vf scale=-1:331 -qscale:v 0 pipe:' 
   
   cmd = f'ffmpeg -i {video_path} -f rawvideo -pix_fmt rgb24 -threads 1 -r {fps} pipe:'
-  process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, bufsize=10**8, stderr=subprocess.DEVNULL)
+  pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, bufsize=10**8, stderr=subprocess.DEVNULL)
+
   while True:
-    buffer = process.stdout.read(H*W*3)
+    buffer = pipe.stdout.read(H*W*3)
     if len(buffer) != H*W*3:
       break
     out.append(np.frombuffer(buffer, np.uint8).reshape(H, W, 3))
-
-  process.stdout.close()
-  process.wait()
+  pipe.stdout.close()
+  pipe.wait()
   return out
 
 ############# Data augmentation #############
@@ -172,27 +171,27 @@ class WLASLDataset(data.Dataset):
   def __len__(self):
     return len(self.df)
 
-"""
+
 
 ################# Test up/downsampling, flipping and cropping #################
-import pandas as pd
-df = pd.read_csv('data/WLASL/WLASL_labels.csv')
-img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_videos')
-WLASL = WLASLTrainDataset(df, img_folder, seq_len=64, grayscale=False)
-img1, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
-print("FINAL SHAPE: ", img1.size())
+# import pandas as pd
+# df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
+# img_folder = "/work3/s204503/bach-data/WLASL/WLASL2000"
+# # pdb.set_trace()
+# WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+# img1, trg_word = WLASL.__getitem__(10) # example of downsampling 72 --> 64
+# print("FINAL SHAPE: ", img1.size())
 
-img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
-print(f"img2: {img2.size()}")
+# img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
+# print(f"img2: {img2.size()}")
 
-img1_r = revert_transform_rgb(img1)
-imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
+# img1_r = revert_transform_rgb(img1)
+# imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
 
-imgs1_r[5].show()
-imgs1_r[10].show()
-imgs1_r[15].show()
-imgs1_r[20].show()
-"""
+# imgs1_r[5].show()
+# imgs1_r[10].show()
+# imgs1_r[15].show()
+# imgs1_r[20].show()
 
 
 """

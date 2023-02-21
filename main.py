@@ -37,7 +37,7 @@ class cfg:
     self.lr = 0.1
     self.momentum = 0.9
     self.weight_decay = 5e-4
-    self.num_workers = 1
+    self.num_workers = 4
     self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
@@ -99,16 +99,17 @@ def main():
     dataloaderVal = DataLoader(WLASLtest, batch_size=CFG.batch_size, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
+    print("Transferring model to GPU")
     model.cuda()                   
-      
+  
   criterion = nn.CrossEntropyLoss().cuda()
   
   train_losses = []
   val_losses = []
 
-  pdb.set_trace()
-
+  print("Starting training loop")
   for epoch in range(CFG.start_epoch, CFG.n_epochs):
+    print(f"Epoch {epoch}")
     # adjust learning rate
     if len(train_losses) > 0:
       if np.abs(np.mean(train_loss) - np.mean(val_loss)) < CFG.epsilon:
@@ -140,7 +141,9 @@ def train(model, dataloader, optimizer, criterion, CFG):
   model.train()
   start = time.time()
 
+
   for i, (ipt, trg) in enumerate(dataloader):
+    pdb.set_trace()
     print(f"processed images size: {ipt.size()}")
     ipt = ipt.squeeze(1).cuda()
     trg=trg.cuda()
@@ -213,4 +216,5 @@ def load_checkpoint(path, model, optimizer):
 
 
 if __name__ == '__main__':
+  # freeze_support()
   main()
