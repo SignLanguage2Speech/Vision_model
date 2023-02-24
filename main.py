@@ -82,7 +82,7 @@ def main():
     val_losses = []
   else: # resume training
     model, optimizer, latest_epoch, train_losses, val_losses = load_checkpoint(CFG.load_path, model, optimizer)
-    model.to('cuda') # TODO when is it cleanest to send to cuda?
+    #model.to('cuda') # TODO when is it cleanest to send to cuda? ### is this redundant? (see line 110)
     CFG.start_epoch = latest_epoch
 
   ############## initialize dataloader ##############
@@ -107,7 +107,7 @@ def main():
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
     print("Transferring model to GPU")
-    model.cuda()                   
+    model.to(device)                   
   
   criterion = nn.CrossEntropyLoss().cuda()
 
@@ -129,19 +129,13 @@ def main():
       if np.abs(np.mean(train_loss) - np.mean(val_loss)) < CFG.epsilon:
         adjust_lr(optimizer, CFG)
 
-    # save progress
-    if epoch == CFG.start_epoch:
-      fname = os.path.join(CFG.save_path, f'S3D_WLASL_{epoch}epoch_{np.round(np.mean(val_losses), 3)}_loss')
-      save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
-
+    ### Save checkpoint ###
     # check if the current model has the lowest validation loss
-    elif np.argmin(np.mean(val_losses, axis=1)) == len(val_losses) - 1:
+    if np.argmin(np.mean(val_losses, axis=1)) == len(val_losses) - 1:
       loss_rounded = np.round(np.mean(val_losses, axis=1)[-1], 3)
       fname = os.path.join(CFG.save_path, f'S3D_WLASL_{epoch}epochs_{loss_rounded}_loss')
       save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
-
-
-
+      # TODO Remove all previously saved models
 
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
