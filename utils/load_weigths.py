@@ -3,7 +3,8 @@ import torch
 
 def load_model_weights(model, weight_filename = 'S3D_kinetics400.pt'):
     
-    weights = torch.load(os.path.join('weights', weight_filename))
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
+    weights = torch.load(os.path.join('weights', weight_filename), map_location=torch.device(device))
     sd = model.state_dict()
 
     for name, param in weights.items():
