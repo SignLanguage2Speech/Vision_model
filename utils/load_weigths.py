@@ -1,7 +1,7 @@
 import os
 import torch
 
-def load_model_weights(model, weight_filename = 'S3D_kinetics400.pt'):
+def load_model_weights(model, weight_filename = 'S3D_kinetics400.pt', verbose=False):
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
     weights = torch.load(os.path.join('weights', weight_filename), map_location=torch.device(device))
@@ -16,8 +16,10 @@ def load_model_weights(model, weight_filename = 'S3D_kinetics400.pt'):
             if param.size() == sd[name].size():
                 sd[name].copy_(param)
             else:
-                print(f"Dimensions do not match...\n parameter: {name} has size {param.size()}\n Original size is: {sd[name].size()}")
+                if verbose:
+                    print(f"Dimensions do not match...\n parameter: {name} has size {param.size()}\n Original size is: {sd[name].size()}")
         else:
-            print(f"Param {name} not in state dict")
+            if verbose:
+                print(f"Param {name} not in state dict")
             
     return model

@@ -18,10 +18,10 @@ class S3D(nn.Module):
             Mixed_4c(),
             Mixed_4d(),
             Mixed_4e(),
-            Mixed_4f()
-            #nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),
-            #Mixed_5b(),
-            #Mixed_5c(),
+            Mixed_4f(),
+            nn.MaxPool3d(kernel_size=(2,2,2), stride=(2,2,2), padding=(0,0,0)),
+            Mixed_5b(),
+            Mixed_5c(),
         )
         self.fc = nn.Sequential(nn.Conv3d(1024, num_class, kernel_size=1, stride=1, bias=True),)
 

@@ -1,8 +1,10 @@
 import numpy as np
 import os
+from PIL import Image
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
+from utils.WLASLDataset import transform_rgb 
 from utils.load_weigths import load_model_weights
 from model import S3D, SepConv3d, BasicConv3d, Mixed_3b, Mixed_3c, Mixed_4b, Mixed_4c, Mixed_4d, Mixed_4e, Mixed_4f
 
@@ -25,7 +27,10 @@ class PrunedS3D(S3D):
             Mixed_4f())
     def forward(self, x):
         y = self.base(x)
-        print(f"dim after self.base: {y.size()}")
+        y = F.avg_pool3d(y, (2, y.size(3), y.size(4)), stride=1) # TODO Evaluate if this is equivalent to "spatial pooling".
+        #print(f"dim after self.base: {y.size()}")
+        
+        return y
 
 
 # dim in --> n_frames x 224 x 224 x 3
@@ -34,11 +39,25 @@ class PrunedS3D(S3D):
 # 12 different base.x 
 
 weights_filename = 'S3D_kinetics400.pt'
+default_wd = os.getcwd()
 
 model = S3D(2000)
 model = load_model_weights(model, weights_filename) 
 
+img_folder = os.path.join(os.getcwd(), 'data/WLASL/WLASL_images/00333')
+os.chdir(img_folder)
+ipt = [np.asarray(Image.open(f)) for f in os.listdir(img_folder)]
+os.chdir(default_wd)
+ipt = transform_rgb(ipt).unsqueeze(0)
 
+model.eval()
+out_default = model(ipt)
+print(f"default out shape: {out_default.size()}")
+model2 = PrunedS3D(2000)
+model2 = load_model_weights(model2, weights_filename)
+model2.eval()
+out = model2(ipt)
+print(f'pruned model output: {out.size()}')
 """
 Comment out everything after Mixed_4f in model.py S3D __init__  --> self.base before running the below line.
 This will give out 
