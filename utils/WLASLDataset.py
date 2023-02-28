@@ -154,8 +154,8 @@ class WLASLDataset(data.Dataset):
       # validation/test dataset
       else:
         ipt = video2array(self.video_names[idx], self.input_dir)
-        ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
         images = transform_rgb(ipt)
+        ipt = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally wiyh 50% prob
         images = self.DataAugmentation.CenterCrop(images) # center crop 224 x 224
         
     # Check if we need to upsample
