@@ -81,8 +81,8 @@ class DataAugmentations:
   # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
     p = np.random.randint(0, 2)
-    if p == 0:
-      # imgs = [np.flip(e, axis=1) for e in imgs]
+    if p < 2: # TODO update this value after testing !!!
+      
       imgs = torchvision.transforms.functional.hflip(imgs)
     return imgs
   
@@ -145,10 +145,9 @@ class WLASLDataset(data.Dataset):
 
     else:
       if self.train:
-        ipt = video2array(self.video_names[idx], self.input_dir)
-        # pdb.set_trace()
-        images = transform_rgb(ipt)
-        ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
+        ipt = video2array(self.video_names[idx], self.input_dir) # convert video to np array
+        images = transform_rgb(ipt) # convert to tensor, reshape and normalize img
+        ipt = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally with 50% prob
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
         images = self.DataAugmentation.RandomRotation(images) # randomly rotate image +- 5 degrees'
 
@@ -181,12 +180,17 @@ class WLASLDataset(data.Dataset):
 
 
 ################# Test up/downsampling, flipping and cropping #################
+
+"""
 import pandas as pd
-df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
-img_folder = "/work3/s204503/bach-data/WLASL/WLASL2000"
+#df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
+#ipt_dir = "/work3/s204503/bach-data/WLASL/WLASL2000"
+df = pd.read_csv("data/WLASL/WLASL_labels.csv")
+ipt_dir = "data/WLASL/WLASL_videos"
+
 # pdb.set_trace()
-WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
-img1, trg_word = WLASL.__getitem__(10) # example of downsampling 72 --> 64
+WLASL = WLASLDataset(df, ipt_dir, seq_len=64, grayscale=False)
+img1, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
 print("FINAL SHAPE: ", img1.size())
 
 img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
@@ -195,10 +199,11 @@ print(f"img2: {img2.size()}")
 img1_r = revert_transform_rgb(img1)
 imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
 
-imgs1_r[5].save('./test_img_1.png')
-imgs1_r[10].save('./test_img_2.png')
-imgs1_r[15].save('./test_img_3.png')
-imgs1_r[20].save('./test_img_4.png')
+imgs1_r[0].show()
+imgs1_r[20].show()
+imgs1_r[40].show()
+imgs1_r[60].show()
+"""
 
 
 """
