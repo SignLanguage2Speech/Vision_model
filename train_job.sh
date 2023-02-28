@@ -35,5 +35,7 @@ module load cuda/11.5
 module load cudnn/v8.3.2.44-prod-cuda-11.5
 module load ffmpeg
 
-source /zhome/2b/d/156632/Desktop/bachelor/Vision_model/bach/bin/activate
-python3 /zhome/2b/d/156632/Desktop/bachelor/Vision_model/main.py
+### source /zhome/2b/d/156632/Desktop/bachelor/Vision_model/bach/bin/activate
+### python3 /zhome/2b/d/156632/Desktop/bachelor/Vision_model/main.py
+source /zhome/d6/f/156047/BachelorProject/Vision_model/bach/bin/activate
+python3 /zhome/d6/f/156047/BachelorProject/Vision_model/main.py
