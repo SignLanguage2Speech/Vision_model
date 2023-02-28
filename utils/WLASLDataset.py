@@ -147,7 +147,7 @@ class WLASLDataset(data.Dataset):
       if self.train:
         ipt = video2array(self.video_names[idx], self.input_dir) # convert video to np array
         images = transform_rgb(ipt) # convert to tensor, reshape and normalize img
-        ipt = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally with 50% prob
+        images = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally with 50% prob
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
         images = self.DataAugmentation.RandomRotation(images) # randomly rotate image +- 5 degrees'
 
@@ -155,7 +155,7 @@ class WLASLDataset(data.Dataset):
       else:
         ipt = video2array(self.video_names[idx], self.input_dir)
         images = transform_rgb(ipt)
-        ipt = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally wiyh 50% prob
+        images = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally wiyh 50% prob
         images = self.DataAugmentation.CenterCrop(images) # center crop 224 x 224
         
     # Check if we need to upsample
