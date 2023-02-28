@@ -31,6 +31,10 @@ class DataPaths_dummy:
     self.wlasl_videos = "/work3/s204503/bach-data/WLASL/WLASL100"
     self.wlasl_labels = "/work3/s204503/bach-data/WLASL/WLASL100_labels.csv"
 
+class DataPathsLocalMichael:
+  def __init__(self):
+    self.wlasl_videos = os.path.join(os.getcwd(), 'data\\WLASL\\WLASL_videos')
+    self.wlasl_labels = os.path.join(os.getcwd(), 'data\\WLASL\\WLASL_labels.csv')
 
 class cfg:
   def __init__(self):
@@ -44,9 +48,8 @@ class cfg:
     self.lr = 0.1
     self.momentum = 0.9
     self.weight_decay = 5e-4
-    # self.num_workers = 4 # ! Set to 0 for debugging
-    self.num_workers = 0 # ! Set to 0 for debugging
-    self.print_freq = 100
+    self.num_workers = 4 # ! Set to 0 for debugging
+    self.print_freq = 5
     self.multipleGPUs = False
     # for data augmentation
     self.crop_size=224
@@ -55,8 +58,9 @@ class cfg:
     
     
 def main():
-  dp = DataPaths() # DATA PATHS
+  #dp = DataPaths() # DATA PATHS
   # dp = DataPaths_dummy()
+  dp = DataPathsLocalMichael()
   CFG = cfg()
   ############## load data ##############
   df = pd.read_csv(dp.wlasl_labels)
@@ -138,6 +142,17 @@ def main():
       fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch}_epochs-{loss_rounded:.6f}_loss')
       save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
       # TODO Remove all previously saved models
+    
+    """
+    ########### Test dataloader ###########
+    for i, (ipt, trg) in enumerate(dataloaderTrain):
+      ipt = ipt.cuda()
+      trg = trg.cuda()
+
+      if i % 5 == 0:
+        print(f"At iter: {i}/{len(dataloaderTrain)}")
+    """
+    
 
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
@@ -222,4 +237,6 @@ def load_checkpoint(path, model, optimizer):
 
 if __name__ == '__main__':
   # freeze_support()
-  main()
+  #main()
+  print(torch.cuda.device_count())
+  print(torch.cuda.get_device_name(0))
