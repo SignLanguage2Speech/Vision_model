@@ -12,17 +12,14 @@ import pdb
 """
 Function that converts List of RGB images to [batch_size x 3 x n_frames x H x W]
 """
-def transform_rgb(snippet):
-  #print(f"Number of images being transformed: {len(snippet)}")
-  #print(f"Original image size: {snippet[0].shape}")
+def transform_rgb(video_arr):
   ''' stack & normalization '''
-  # pdb.set_trace()
-  snippet = np.concatenate(snippet, axis=-1) # freezes on HPC?
-  snippet = torch.from_numpy(snippet).permute(2, 0, 1).contiguous().float()
-  snippet = snippet.mul_(2.).sub_(255).div(255)
-  out = snippet.view(-1,3,snippet.size(1),snippet.size(2)).permute(1,0,2,3)
-  #print(f"Post transformation size: {out.size()}")
-  #[333, 333, 3] --> [1, 3, 21, 333, 333]
+
+  tensor1 = video_arr.contiguous().view(video_arr.size(1),video_arr.size(2),-1)
+  tensor2 = tensor1.permute(2, 0, 1).contiguous().float()
+  tensor2 = tensor2.mul_(2.).sub_(255).div(255)
+  out = tensor2.view(-1,3,tensor2.size(1),tensor2.size(2)).permute(1,0,2,3)
+
   return out
 
 
@@ -54,18 +51,26 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   H = W = 256 # default dims for WLASL
   name, ext = os.path.splitext(vname)
   video_path = os.path.join(input_dir, vname)
-  out = []
+  # out = []
+  get_no_of_frames = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0',video_path]
+  no_of_frames = int(subprocess.check_output(get_no_of_frames))
+  # pdb.set_trace()
+  out = torch.zeros((no_of_frames,H,W,3))
   
   cmd = f'ffmpeg -i {video_path} -f rawvideo -pix_fmt rgb24 -threads 1 -r {fps} pipe:'
   pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, bufsize=10**8, stderr=subprocess.DEVNULL)
 
-  while True:
+  # while True:
+  for i in range(no_of_frames):
     buffer = pipe.stdout.read(H*W*3)
     if len(buffer) != H*W*3:
       break
-    out.append(np.frombuffer(buffer, np.uint8).reshape(H, W, 3))
+    # out.append(np.frombuffer(buffer, np.uint8).reshape(H, W, 3))
+    out[i,:,:,:] = torch.tensor(np.frombuffer(buffer, dtype=np.uint8).reshape(H, W, 3)) # TODO can this be done in fewer conversions?
+    # pdb.set_trace()
   pipe.stdout.close()
   pipe.wait()
+  # pdb.set_trace()
   return out
 
 ############# Data augmentation #############
@@ -78,7 +83,8 @@ class DataAugmentations:
   def HorizontalFlip(self, imgs):
     p = np.random.randint(0, 2)
     if p == 0:
-      imgs = [np.flip(e, axis=1) for e in imgs]
+      # imgs = [np.flip(e, axis=1) for e in imgs]
+      imgs = torchvision.transforms.functional.hflip(imgs)
     return imgs
   
   # random 224 x 224 crop (same crop for all images in video)
@@ -141,8 +147,9 @@ class WLASLDataset(data.Dataset):
     else:
       if self.train:
         ipt = video2array(self.video_names[idx], self.input_dir)
-        ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
+        # pdb.set_trace()
         images = transform_rgb(ipt)
+        ipt = self.DataAugmentation.HorizontalFlip(ipt) # flip images horizontally wiyh 50% prob
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
         images = self.DataAugmentation.RandomRotation(images) # randomly rotate image +- 5 degrees'
 
@@ -175,24 +182,24 @@ class WLASLDataset(data.Dataset):
 
 
 ################# Test up/downsampling, flipping and cropping #################
-# import pandas as pd
-# df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
-# img_folder = "/work3/s204503/bach-data/WLASL/WLASL2000"
-# # pdb.set_trace()
-# WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
-# img1, trg_word = WLASL.__getitem__(10) # example of downsampling 72 --> 64
-# print("FINAL SHAPE: ", img1.size())
+import pandas as pd
+df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
+img_folder = "/work3/s204503/bach-data/WLASL/WLASL2000"
+# pdb.set_trace()
+WLASL = WLASLDataset(df, img_folder, seq_len=64, grayscale=False)
+img1, trg_word = WLASL.__getitem__(10) # example of downsampling 72 --> 64
+print("FINAL SHAPE: ", img1.size())
 
-# img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
-# print(f"img2: {img2.size()}")
+img2, trg_word = WLASL.__getitem__(3) # example of upsampling 56 ---> 64
+print(f"img2: {img2.size()}")
 
-# img1_r = revert_transform_rgb(img1)
-# imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
+img1_r = revert_transform_rgb(img1)
+imgs1_r = [Image.fromarray(img.astype(np.uint8)) for img in img1_r]
 
-# imgs1_r[5].show()
-# imgs1_r[10].show()
-# imgs1_r[15].show()
-# imgs1_r[20].show()
+imgs1_r[5].save('./test_img_1.png')
+imgs1_r[10].save('./test_img_2.png')
+imgs1_r[15].save('./test_img_3.png')
+imgs1_r[20].save('./test_img_4.png')
 
 
 """

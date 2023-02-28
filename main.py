@@ -35,16 +35,17 @@ class DataPaths_dummy:
 class cfg:
   def __init__(self):
     self.start_epoch = 0
-    self.n_epochs = 80
+    self.n_epochs = 10
     self.save_path = os.path.join('/work3/s204503/bach-models', 'trained_models')
-    self.load_path = os.path.join(self.save_path, 'S3D_WLASL_14epochs_2.4790000915527344_loss')
+    self.load_path = os.path.join(self.save_path, '') # ! Fill empty string with model file name
     self.checkpoint = None # start from scratch, i.e. epoch 0
     # self.checkpoint = True # start from checkpoint set in self.load_path
     self.batch_size = 6 # per GPU (they have 56 haha)
     self.lr = 0.1
     self.momentum = 0.9
     self.weight_decay = 5e-4
-    self.num_workers = 4 # ! Set to 0 for debugging
+    # self.num_workers = 4 # ! Set to 0 for debugging
+    self.num_workers = 0 # ! Set to 0 for debugging
     self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
@@ -54,8 +55,8 @@ class cfg:
     
     
 def main():
-  # dp = DataPaths() # DATA PATHS
-  dp = DataPaths_dummy()
+  dp = DataPaths() # DATA PATHS
+  # dp = DataPaths_dummy()
   CFG = cfg()
   ############## load data ##############
   df = pd.read_csv(dp.wlasl_labels)
@@ -113,7 +114,8 @@ def main():
 
   print("Starting training loop")
   for epoch in range(CFG.start_epoch, CFG.n_epochs):
-    train_loss = train_losses[-1]
+    # pdb.set_trace()
+    # train_loss = train_losses[-1]
     print(f"Epoch {epoch}")
     
     # run train loop
@@ -133,7 +135,7 @@ def main():
     # check if the current model has the lowest validation loss
     if np.argmin(np.mean(val_losses, axis=1)) == len(val_losses) - 1:
       loss_rounded = np.round(np.mean(val_losses, axis=1)[-1], 3)
-      fname = os.path.join(CFG.save_path, f'S3D_WLASL_{epoch}epochs_{loss_rounded}_loss')
+      fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch}_epochs-{loss_rounded:.6f}_loss')
       save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
       # TODO Remove all previously saved models
 
@@ -163,7 +165,7 @@ def train(model, dataloader, optimizer, criterion, CFG):
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses)}\nTime: {np.round(end - start, 2)/60} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nTime: {np.round(end - start, 2)/60} min")
 
   return losses
 
@@ -186,7 +188,7 @@ def validate(model, dataloader, criterion, CFG):
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses)}\nTime: {np.round(end - start, 2)/60} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nTime: {np.round(end - start, 2)/60} min")
 
   return losses
 

@@ -1,0 +1,9 @@
+Loaded dependency [python3/3.10.7]: gcc/11.3.0-binutils-2.38
+Loaded module: python3/3.10.7
+
+Loading python3/3.10.7
+  Loading requirement: gcc/11.3.0-binutils-2.38
+Loaded module: cuda/11.5
+Loaded module: cudnn/v8.3.2.44-prod-cuda-11.5
+Loaded module: ffmpeg/5.0.1
+/zhome/2b/d/156632/.lsbatch/1677512203.15445387.shell: line 39: 146717 Killed                  python3 /zhome/2b/d/156632/Desktop/bachelor/Vision_model/main.py
