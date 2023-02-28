@@ -237,6 +237,7 @@ def load_checkpoint(path, model, optimizer):
 
 if __name__ == '__main__':
   # freeze_support()
-  #main()
-  print(torch.cuda.device_count())
-  print(torch.cuda.get_device_name(0))
+  main()
+  #devices = [i for i in range(torch.cuda.device_count())]
+  
+  
