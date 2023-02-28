@@ -10,16 +10,16 @@ import torchvision
 import pdb
 
 """
-Function that converts List of RGB images to [batch_size x 3 x n_frames x H x W]
+Function that converts array of RGB images to [batch_size x 3 x n_frames x H x W]
 """
-def transform_rgb(video_arr):
+
+def transform_rgb(video):
   ''' stack & normalization '''
 
-  tensor1 = video_arr.contiguous().view(video_arr.size(1),video_arr.size(2),-1)
-  tensor2 = tensor1.permute(2, 0, 1).contiguous().float()
-  tensor2 = tensor2.mul_(2.).sub_(255).div(255)
-  out = tensor2.view(-1,3,tensor2.size(1),tensor2.size(2)).permute(1,0,2,3)
-
+  video = np.concatenate(video, axis=-1)
+  video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()
+  video = video.mul_(2.).sub_(255).div(255)
+  out = video.view(-1,3,video.size(1),video.size(2)).permute(1,0,2,3)
   return out
 
 
@@ -53,20 +53,19 @@ def video2array(vname, input_dir=os.path.join(os.getcwd(), 'data/WLASL/WLASL_vid
   video_path = os.path.join(input_dir, vname)
   # out = []
   get_no_of_frames = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0',video_path]
-  no_of_frames = int(subprocess.check_output(get_no_of_frames))
+  n_frames = int(subprocess.check_output(get_no_of_frames))
   # pdb.set_trace()
-  out = torch.zeros((no_of_frames,H,W,3))
-  
+  out = np.zeros((n_frames,H,W,3))
   cmd = f'ffmpeg -i {video_path} -f rawvideo -pix_fmt rgb24 -threads 1 -r {fps} pipe:'
   pipe = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, bufsize=10**8, stderr=subprocess.DEVNULL)
 
   # while True:
-  for i in range(no_of_frames):
+  for i in range(n_frames):
     buffer = pipe.stdout.read(H*W*3)
     if len(buffer) != H*W*3:
       break
     # out.append(np.frombuffer(buffer, np.uint8).reshape(H, W, 3))
-    out[i,:,:,:] = torch.tensor(np.frombuffer(buffer, dtype=np.uint8).reshape(H, W, 3)) # TODO can this be done in fewer conversions?
+    out[i,:,:,:] = np.frombuffer(buffer, dtype=np.uint8).reshape(H, W, 3)
     # pdb.set_trace()
   pipe.stdout.close()
   pipe.wait()
