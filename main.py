@@ -23,24 +23,20 @@ import pdb
 # stores directory paths for data on HPC
 class DataPaths:
   def __init__(self):
-    self.wlasl_videos = "/work3/s204503/bach-data/WLASL/WLASL2000"
-    self.wlasl_labels = "/work3/s204503/bach-data/WLASL/WLASL_labels.csv"
+    self.wlasl_videos = "/work3/s204138/bach-data/WLASL/WLASL2000"
+    self.wlasl_labels = "/work3/s204138/bach-data/WLASL/WLASL_labels.csv"
 
 class DataPaths_dummy:
   def __init__(self):
     self.wlasl_videos = "/work3/s204503/bach-data/WLASL/WLASL100"
     self.wlasl_labels = "/work3/s204503/bach-data/WLASL/WLASL100_labels.csv"
 
-class DataPathsLocalMichael:
-  def __init__(self):
-    self.wlasl_videos = os.path.join(os.getcwd(), 'data\\WLASL\\WLASL_videos')
-    self.wlasl_labels = os.path.join(os.getcwd(), 'data\\WLASL\\WLASL_labels.csv')
 
 class cfg:
   def __init__(self):
     self.start_epoch = 0
     self.n_epochs = 10
-    self.save_path = os.path.join('/work3/s204503/bach-models', 'trained_models')
+    self.save_path = os.path.join('/work3/s204138/bach-models', 'trained_models')
     self.load_path = os.path.join(self.save_path, '') # ! Fill empty string with model file name
     self.checkpoint = None # start from scratch, i.e. epoch 0
     # self.checkpoint = True # start from checkpoint set in self.load_path
@@ -58,20 +54,20 @@ class cfg:
     
     
 def main():
-  #dp = DataPaths() # DATA PATHS
+  dp = DataPaths() # DATA PATHS
   # dp = DataPaths_dummy()
-  dp = DataPathsLocalMichael()
   CFG = cfg()
+
   ############## load data ##############
   df = pd.read_csv(dp.wlasl_labels)
   img_folder = dp.wlasl_videos
-  # WLASL = WLASLDataset(df, img_folder, seq_len=CFG.seq_len, grayscale=False)
-  
-  # Get datasets
+
+  # get datasets
   WLASLtrain = WLASLDataset(df.loc[df['split']=='train'], img_folder, seq_len=CFG.seq_len,train=True, grayscale=False)
   WLASLval = WLASLDataset(df.loc[df['split']=='val'], img_folder, seq_len=CFG.seq_len, train=False, grayscale=False)
   WLASLtest = WLASLDataset(df.loc[df['split']=='test'], img_folder, seq_len=CFG.seq_len, train=False, grayscale=False)
   print("TRAIN LEN: ", len(df.loc[df['split']=='train']))
+
   ############## initialize model and optimizer ##############
   n_classes = len(set(df['gloss'])) #2000
   model = S3D(n_classes)
@@ -142,27 +138,15 @@ def main():
       fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch}_epochs-{loss_rounded:.6f}_loss')
       save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
       # TODO Remove all previously saved models
-    
-    """
-    ########### Test dataloader ###########
-    for i, (ipt, trg) in enumerate(dataloaderTrain):
-      ipt = ipt.cuda()
-      trg = trg.cuda()
 
-      if i % 5 == 0:
-        print(f"At iter: {i}/{len(dataloaderTrain)}")
-    """
-    
 
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
   model.train()
   start = time.time()
 
-
   for i, (ipt, trg) in enumerate(dataloader):
-    # pdb.set_trace()
-    # print(f"processed images size: {ipt.size()}")
+
     ipt = ipt.cuda()
     trg = trg.cuda()
     ipt_var = torch.autograd.Variable(ipt)
@@ -238,6 +222,5 @@ def load_checkpoint(path, model, optimizer):
 if __name__ == '__main__':
   # freeze_support()
   main()
-  #devices = [i for i in range(torch.cuda.device_count())]
   
   
