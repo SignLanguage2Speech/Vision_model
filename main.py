@@ -28,14 +28,14 @@ class DataPaths:
 
 class DataPaths_dummy:
   def __init__(self):
-    self.wlasl_videos = "/work3/s204503/bach-data/WLASL/WLASL100"
-    self.wlasl_labels = "/work3/s204503/bach-data/WLASL/WLASL100_labels.csv"
+    self.wlasl_videos = "/work3/s204138/bach-data/WLASL/WLASL100"
+    self.wlasl_labels = "/work3/s204138/bach-data/WLASL/WLASL100_labels.csv"
 
 
 class cfg:
   def __init__(self):
     self.start_epoch = 0
-    self.n_epochs = 10
+    self.n_epochs = 20
     self.save_path = os.path.join('/work3/s204138/bach-models', 'trained_models')
     self.load_path = os.path.join(self.save_path, '') # ! Fill empty string with model file name
     self.checkpoint = None # start from scratch, i.e. epoch 0
@@ -45,7 +45,7 @@ class cfg:
     self.momentum = 0.9
     self.weight_decay = 5e-4
     self.num_workers = 4 # ! Set to 0 for debugging
-    self.print_freq = 5
+    self.print_freq = 1
     self.multipleGPUs = False
     # for data augmentation
     self.crop_size=224
@@ -54,8 +54,8 @@ class cfg:
     
     
 def main():
-  dp = DataPaths() # DATA PATHS
-  # dp = DataPaths_dummy()
+  #dp = DataPaths() # DATA PATHS
+  dp = DataPaths_dummy()
   CFG = cfg()
 
   ############## load data ##############
@@ -85,10 +85,7 @@ def main():
     val_accs = []
   
   else: # resume training
-    model, optimizer, latest_epoch, train_losses, val_losses = load_checkpoint(CFG.load_path, model, optimizer)
-    # TODO add train_accs and val_accs to the saved checkpoint...
-    train_accs = [] 
-    val_accs = []
+    model, optimizer, latest_epoch, train_losses, val_losses, train_accs, val_accs = load_checkpoint(CFG.load_path, model, optimizer)
     CFG.start_epoch = latest_epoch
 
   ############## initialize dataloader ##############
@@ -134,24 +131,24 @@ def main():
     val_accs.append(val_acc)
 
     # adjust learning rate
-    if len(train_losses) > 0:
-      if np.abs(np.mean(train_loss) - np.mean(val_loss)) < CFG.epsilon:
-        adjust_lr(optimizer, CFG)
+    #if np.abs(np.mean(train_loss) - np.mean(val_loss)) < CFG.epsilon:
+    #  adjust_lr(optimizer, CFG)
 
     ### Save checkpoint ###
     # check if the current model has the lowest validation loss
-    if np.argmin(np.mean(val_losses, axis=1)) == len(val_losses) - 1:
-      loss_rounded = np.round(np.mean(val_losses, axis=1)[-1], 3)
-      fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch}_epochs-{loss_rounded:.6f}_loss')
-      save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
+    #if np.argmin(np.mean(val_losses, axis=1)) == len(val_losses) - 1:
+    loss_rounded = np.round(np.mean(val_losses, axis=1)[-1], 3)
+    fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch+1}_epochs-{loss_rounded:.6f}_loss_{val_acc:5f}_acc')
+    save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses, train_accs, val_accs)
       # TODO Remove all previously saved models
+    
+    
 
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
-  acc = 0
   model.train()
   start = time.time()
-
+  acc = 0
   for i, (ipt, trg) in enumerate(dataloader):
 
     ipt = ipt.cuda()
@@ -161,26 +158,26 @@ def train(model, dataloader, optimizer, criterion, CFG):
 
     out = model(ipt_var)
     # pdb.set_trace()
-    probs = F.softmax(out,dim=1)
+    probs = F.softmax(out, dim=1)
     loss = criterion(probs, trg_var)
     losses.append(loss.detach().cpu())
 
     # compute model accuracy
     preds = torch.argmax(probs, dim=1)
-    for i in range(len(preds)):
-      if preds[i] == np.where(trg[i] == 1)[0][0]:
+    for j in range(len(preds)):
+      if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
         acc += 1
     
-
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\Current accuracy: {acc / (CFG.batch_size*(i+1)):.5f}\nTime: {np.round(end - start, 2)/60} min")
 
-  acc = acc/len(dataloader)
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / (CFG.batch_size*(i+1)):.4f}\nTime: {(end - start)/60:.4f} min")
+
+  acc = acc/len(dataloader.dataset)
   print(f"Final training accuracy: {acc}")
   return losses, acc
 
@@ -198,21 +195,21 @@ def validate(model, dataloader, criterion, CFG):
 
     out = model(ipt_var)
 
-    probs = F.softmax(out,dim=1)
+    probs = F.softmax(out, dim=1)
     loss = criterion(probs, trg_var)
     losses.append(loss.detach().cpu())
 
     # compute model accuracy
     preds = torch.argmax(probs, dim=1)
-    for i in range(len(preds)):
-      if preds[i] == np.where(trg[i] == 1)[0][0]:
+    for j in range(len(preds)):
+      if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
         acc += 1
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\Current accuracy: {acc / (CFG.batch_size*(i+1)):.5f}\nTime: {np.round(end - start, 2)/60} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / (CFG.batch_size*(i+1)):.4f}\nTime: {(end - start)/60:.4f} min")
 
-  acc = acc/len(dataloader)
+  acc = acc/len(dataloader.dataset)
   print(f"Final validation accuracy: {acc}")
   return losses, acc
 
@@ -224,15 +221,16 @@ def adjust_lr(optimizer, CFG):
     param['weight_decay'] = CFG.weight_decay
 
 
-def save_checkpoint(path, model, optimizer, epoch, train_losses, val_losses):
+def save_checkpoint(path, model, optimizer, epoch, train_losses, val_losses, train_accs, val_accs):
   # save a general checkpoint
   torch.save({'epoch' : epoch,
               'model_state_dict' : model.state_dict(),
               'optimizer_state_dict' : optimizer.state_dict(),
               'train_losses' : train_losses,
-              'val_losses' : val_losses
+              'val_losses' : val_losses,
+              'train_accs' : train_accs,
+              'val_accs' : val_accs
               }, path)
-
 
 def load_checkpoint(path, model, optimizer):
   checkpoint = torch.load(path)
@@ -241,11 +239,17 @@ def load_checkpoint(path, model, optimizer):
   epoch = checkpoint['epoch']
   train_losses = checkpoint['train_losses']
   val_losses = checkpoint['val_losses']
-  return model, optimizer, epoch, train_losses, val_losses
+  train_accs = checkpoint['train_accs']
+  val_accs = checkpoint['val_accs']
+  return model, optimizer, epoch, train_losses, val_losses, train_accs, val_accs
 
 
 if __name__ == '__main__':
   # freeze_support()
   main()
+  #dp = DataPaths_dummy()
+  #df = pd.read_csv(dp.wlasl_labels)
+  #print(df[:50])
+  #print(df[50:])
   
   
