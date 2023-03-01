@@ -80,10 +80,15 @@ def main():
   if CFG.checkpoint is None: # if no newer model, use basics => pretrained on kinetics
     model = load_model_weights(model, 'S3D_kinetics400.pt')
     train_losses = []
+    train_accs = []
     val_losses = []
+    val_accs = []
+  
   else: # resume training
     model, optimizer, latest_epoch, train_losses, val_losses = load_checkpoint(CFG.load_path, model, optimizer)
-    #model.to('cuda') # TODO when is it cleanest to send to cuda? ### is this redundant? (see line 110)
+    # TODO add train_accs and val_accs to the saved checkpoint...
+    train_accs = [] 
+    val_accs = []
     CFG.start_epoch = latest_epoch
 
   ############## initialize dataloader ##############
@@ -119,12 +124,14 @@ def main():
     print(f"Epoch {epoch}")
     
     # run train loop
-    train_loss = train(model, dataloaderTrain, optimizer, criterion, CFG)
+    train_loss, train_acc = train(model, dataloaderTrain, optimizer, criterion, CFG)
     train_losses.append(train_loss)
+    train_accs.append(train_acc)
 
     # run validation loop
-    val_loss = validate(model, dataloaderVal, criterion, CFG)
+    val_loss, val_acc = validate(model, dataloaderVal, criterion, CFG)
     val_losses.append(val_loss)
+    val_accs.append(val_acc)
 
     # adjust learning rate
     if len(train_losses) > 0:
@@ -139,9 +146,9 @@ def main():
       save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses)
       # TODO Remove all previously saved models
 
-
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
+  acc = 0
   model.train()
   start = time.time()
 
@@ -154,9 +161,16 @@ def train(model, dataloader, optimizer, criterion, CFG):
 
     out = model(ipt_var)
     # pdb.set_trace()
-    preds = F.softmax(out,dim=1)
-    loss = criterion(preds, trg_var)
+    probs = F.softmax(out,dim=1)
+    loss = criterion(probs, trg_var)
     losses.append(loss.detach().cpu())
+
+    # compute model accuracy
+    preds = torch.argmax(probs, dim=1)
+    for i in range(len(preds)):
+      if preds[i] == np.where(trg[i] == 1)[0][0]:
+        acc += 1
+    
 
     optimizer.zero_grad()
     loss.backward()
@@ -164,15 +178,17 @@ def train(model, dataloader, optimizer, criterion, CFG):
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nTime: {np.round(end - start, 2)/60} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\Current accuracy: {acc / (CFG.batch_size*(i+1)):.5f}\nTime: {np.round(end - start, 2)/60} min")
 
-  return losses
+  acc = acc/len(dataloader)
+  print(f"Final training accuracy: {acc}")
+  return losses, acc
 
 def validate(model, dataloader, criterion, CFG):
   losses = []
   model.eval()
   start = time.time()
-
+  acc = 0
   for i, (ipt, trg) in enumerate(dataloader):
     
     ipt = ipt.cuda()
@@ -181,15 +197,24 @@ def validate(model, dataloader, criterion, CFG):
     trg_var = torch.autograd.Variable(trg)
 
     out = model(ipt_var)
-    preds = F.softmax(out, dim=1)
-    loss = criterion(preds, trg_var)
+
+    probs = F.softmax(out,dim=1)
+    loss = criterion(probs, trg_var)
     losses.append(loss.detach().cpu())
+
+    # compute model accuracy
+    preds = torch.argmax(probs, dim=1)
+    for i in range(len(preds)):
+      if preds[i] == np.where(trg[i] == 1)[0][0]:
+        acc += 1
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nTime: {np.round(end - start, 2)/60} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\Current accuracy: {acc / (CFG.batch_size*(i+1)):.5f}\nTime: {np.round(end - start, 2)/60} min")
 
-  return losses
+  acc = acc/len(dataloader)
+  print(f"Final validation accuracy: {acc}")
+  return losses, acc
 
 
 def adjust_lr(optimizer, CFG):
