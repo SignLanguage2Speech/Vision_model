@@ -132,20 +132,29 @@ class WLASLDataset(data.Dataset):
     super().__init__()
     self.df = df
     self.input_dir = input_dir
-    self.video_names = os.listdir(self.input_dir)
+    self.video_names = list(df['video_id'])
     self.grayscale = grayscale
     self.seq_len = seq_len
     self.DataAugmentation = DataAugmentations()
     self.train = train
+    self.vocab_size = len(set(self.df['gloss']))
 
   def __getitem__(self, idx):
+    
+    vname = str(self.video_names[idx])
+    if len(vname) < 5:
+      if len(vname) == 4:
+        vname = '0' + vname
+      elif len(vname) == 3:
+        vname = '00' + vname
+    vname = vname + '.mp4'
 
     if self.grayscale:
       raise(NotImplementedError)
 
     else:
       if self.train:
-        ipt = video2array(self.video_names[idx], self.input_dir) # convert video to np array
+        ipt = video2array(vname, self.input_dir) # convert video to np array
         images = transform_rgb(ipt) # convert to tensor, reshape and normalize img
         images = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally with 50% prob
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
@@ -168,10 +177,16 @@ class WLASLDataset(data.Dataset):
 
     # pdb.set_trace()
     # make a one-hot vector for target class
-    trg = torch.zeros(len(set(self.df['gloss']))) # 2000 unique words
+    trg = torch.zeros(self.vocab_size) # 2000 unique words
     gloss_idx = self.df.iloc[idx]['label']
     trg[gloss_idx] = 1
     
+    ### Sanity checks
+    #print(f"Video_id via video_names: {self.video_names[idx]}")
+    #print(f"Ground truth gloss in df {self.df.iloc[idx]['label']}")
+    #print(f"video_id via df {self.df.iloc[idx]['video_id']}")
+    #print(f"index where target is one (1-hot vec) {np.where(trg ==1)[0][0]}")
+
     return images, trg
   
   def __len__(self):
@@ -180,7 +195,6 @@ class WLASLDataset(data.Dataset):
 
 
 ################# Test up/downsampling, flipping and cropping #################
-
 """
 import pandas as pd
 #df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
