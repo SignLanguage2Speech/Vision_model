@@ -142,12 +142,7 @@ class WLASLDataset(data.Dataset):
   def __getitem__(self, idx):
     
     vname = str(self.video_names[idx])
-    if len(vname) < 5:
-      if len(vname) == 4:
-        vname = '0' + vname
-      elif len(vname) == 3:
-        vname = '00' + vname
-    vname = vname + '.mp4'
+    vname = "0" * 5-len(vname) + vname + '.mp4'
 
     if self.grayscale:
       raise(NotImplementedError)
