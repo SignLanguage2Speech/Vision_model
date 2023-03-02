@@ -82,7 +82,6 @@ class DataAugmentations:
   def HorizontalFlip(self, imgs):
     p = np.random.randint(0, 2)
     if p < 2: # TODO update this value after testing !!!
-      
       imgs = torchvision.transforms.functional.hflip(imgs)
     return imgs
   
@@ -112,18 +111,13 @@ def upsample(images, seq_len):
     start_idx = np.random.randint(0, images_org.size(1) - (seq_len - images.size(1))) 
     stop_idx = start_idx + (seq_len - images.size(1))
     images = torch.cat((images, images_org[:, start_idx:stop_idx]), dim=1)
-  
+
   return images
-
-
 
 def downsample(images, seq_len):
   start_idx = np.random.randint(0, images.size(1) - seq_len)
   stop_idx = start_idx + seq_len
   return images[:, start_idx:stop_idx]
-
-
-
 
 ############# Dataset class #############
 class WLASLDataset(data.Dataset):
@@ -157,7 +151,7 @@ class WLASLDataset(data.Dataset):
 
       # validation/test dataset
       else:
-        ipt = video2array(self.video_names[idx], self.input_dir)
+        ipt = video2array(vname, self.input_dir)
         images = transform_rgb(ipt)
         images = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally wiyh 50% prob
         images = self.DataAugmentation.CenterCrop(images) # center crop 224 x 224
