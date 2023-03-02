@@ -175,7 +175,7 @@ def train(model, dataloader, optimizer, criterion, CFG):
     end = time.time()
     if i % CFG.print_freq == 0:
 
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / (CFG.batch_size*(i+1)):.4f}\nTime: {(end - start)/60:.4f} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
   print(f"Final training accuracy: {acc}")
@@ -207,7 +207,7 @@ def validate(model, dataloader, criterion, CFG):
     
     end = time.time()
     if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / (CFG.batch_size*(i+1)):.4f}\nTime: {(end - start)/60:.4f} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
   print(f"Final validation accuracy: {acc}")
