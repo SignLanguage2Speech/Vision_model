@@ -187,27 +187,27 @@ def validate(model, dataloader, criterion, CFG):
   start = time.time()
   acc = 0
   for i, (ipt, trg) in enumerate(dataloader):
-    
-    ipt = ipt.cuda()
-    trg = trg.cuda()
-    ipt_var = torch.autograd.Variable(ipt)
-    trg_var = torch.autograd.Variable(trg)
+    with torch.no_grad():
+      ipt = ipt.cuda()
+      trg = trg.cuda()
+      ipt_var = torch.autograd.Variable(ipt)
+      trg_var = torch.autograd.Variable(trg)
 
-    out = model(ipt_var)
+      out = model(ipt_var)
 
-    probs = F.softmax(out, dim=1)
-    loss = criterion(probs, trg_var)
-    losses.append(loss.detach().cpu())
+      probs = F.softmax(out, dim=1)
+      loss = criterion(probs, trg_var)
+      losses.append(loss.cpu())
 
-    # compute model accuracy
-    preds = torch.argmax(probs, dim=1)
-    for j in range(len(preds)):
-      if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
-        acc += 1
-    
-    end = time.time()
-    if i % CFG.print_freq == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
+      # compute model accuracy
+      preds = torch.argmax(probs, dim=1)
+      for j in range(len(preds)):
+        if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
+          acc += 1
+      
+      end = time.time()
+      if i % CFG.print_freq == 0:
+        print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
   print(f"Final validation accuracy: {acc}")
