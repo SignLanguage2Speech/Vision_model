@@ -31,6 +31,11 @@ class DataPaths_dummy:
     self.wlasl_videos = "/work3/s204138/bach-data/WLASL/WLASL100"
     self.wlasl_labels = "/work3/s204138/bach-data/WLASL/WLASL100_labels.csv"
 
+class DataPathsWLASL1000:
+  def __init__(self):
+    self.wlasl_videos = "/work3/s204138/bach-data/WLASL/WLASL2000"
+    self.wlasl_labels = "/work3/s204138/bach-data/WLASL/WLASL1000_labels.csv"
+    
 
 class cfg:
   def __init__(self):
@@ -45,17 +50,18 @@ class cfg:
     self.momentum = 0.9
     self.weight_decay = 5e-4
     self.num_workers = 4 # ! Set to 0 for debugging
-    self.print_freq = 1
+    self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
-    self.crop_size=224
+    self.crop_size = 224
     self.seq_len = 64
-    self.epsilon = 1e-2 # TODO evaluate value 
+    #self.epsilon = 1e-2 # TODO evaluate value 
     
     
 def main():
-  #dp = DataPaths() # DATA PATHS
-  dp = DataPaths_dummy()
+  dp = DataPaths() # DATA PATHS
+  #dp = DataPathsWLASL1000()
+  #dp = DataPaths_dummy()
   CFG = cfg()
 
   ############## load data ##############
@@ -71,11 +77,12 @@ def main():
   ############## initialize model and optimizer ##############
   n_classes = len(set(df['gloss'])) #2000
   model = S3D(n_classes)
+  
   optimizer = optim.SGD(model.parameters(),
                         CFG.lr,
                         weight_decay=CFG.weight_decay,
                         momentum=CFG.momentum)
-
+  
   ############## Load weights ##############
   if CFG.checkpoint is None: # if no newer model, use basics => pretrained on kinetics
     model = load_model_weights(model, 'S3D_kinetics400.pt')
@@ -109,10 +116,12 @@ def main():
     dataloaderTest = DataLoader(WLASLtest, batch_size=CFG.batch_size, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
-    print("Transferring model to GPU")
+    print(f"Model is on device: {device}")
     model.to(device)                   
   
   criterion = nn.CrossEntropyLoss().cuda()
+
+  scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=5)
 
   print("Starting training loop")
   for epoch in range(CFG.start_epoch, CFG.n_epochs):
@@ -130,51 +139,43 @@ def main():
     val_losses.append(val_loss)
     val_accs.append(val_acc)
 
-    # adjust learning rate
-    #if np.abs(np.mean(train_loss) - np.mean(val_loss)) < CFG.epsilon:
-    #  adjust_lr(optimizer, CFG)
+    scheduler.step(np.mean(val_losses[-1]))
 
     ### Save checkpoint ###
     # check if the current model has the lowest validation loss
     #if np.argmin(np.mean(val_losses, axis=1)) == len(val_losses) - 1:
-    loss_rounded = np.round(np.mean(val_losses, axis=1)[-1], 3)
-    fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch+1}_epochs-{loss_rounded:.6f}_loss_{val_acc:5f}_acc')
+    fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch+1}_epochs-{np.mean(val_loss):.6f}_loss_{val_acc:5f}_acc')
     save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses, train_accs, val_accs)
       # TODO Remove all previously saved models
     
     
-
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
   model.train()
   start = time.time()
   acc = 0
+  print("################## Starting training ##################")
   for i, (ipt, trg) in enumerate(dataloader):
 
     ipt = ipt.cuda()
     trg = trg.cuda()
-    ipt_var = torch.autograd.Variable(ipt)
-    trg_var = torch.autograd.Variable(trg)
-
-    out = model(ipt_var)
-    # pdb.set_trace()
-    probs = F.softmax(out, dim=1)
-    loss = criterion(probs, trg_var)
+    
+    out = model(ipt)
+    loss = criterion(out, trg)
     losses.append(loss.detach().cpu())
 
     # compute model accuracy
-    preds = torch.argmax(probs, dim=1)
+    _, preds = out.topk(1, 1, True, True)
     for j in range(len(preds)):
       if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
         acc += 1
-    
+
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     
     end = time.time()
-    if i % CFG.print_freq == 0:
-
+    if i % (CFG.print_freq) == 0:
       print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
@@ -186,25 +187,26 @@ def validate(model, dataloader, criterion, CFG):
   model.eval()
   start = time.time()
   acc = 0
+  print("################## Starting validation ##################")
   for i, (ipt, trg) in enumerate(dataloader):
     with torch.no_grad():
+      #print(f"Input size: {ipt.size()}")
+      #print(f"Input size: {trg.size()}")
       ipt = ipt.cuda()
       trg = trg.cuda()
 
       out = model(ipt)
-
-      probs = F.softmax(out, dim=1)
-      loss = criterion(probs, ipt)
+      #print(f"probs size: {out.size()}")
+      loss = criterion(out, trg)
       losses.append(loss.cpu())
 
-      # compute model accuracy
-      preds = torch.argmax(probs, dim=1)
+      _, preds = out.topk(1, 1, True, True)
       for j in range(len(preds)):
         if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
           acc += 1
       
       end = time.time()
-      if i % CFG.print_freq == 0:
+      if i % (CFG.print_freq/2) == 0:
         print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
@@ -243,11 +245,7 @@ def load_checkpoint(path, model, optimizer):
 
 
 if __name__ == '__main__':
-  # freeze_support()
   main()
-  #dp = DataPaths_dummy()
-  #df = pd.read_csv(dp.wlasl_labels)
-  #print(df[:50])
-  #print(df[50:])
+
   
   
