@@ -184,7 +184,6 @@ class WLASLDataset(data.Dataset):
 
 
 ################# Test up/downsampling, flipping and cropping #################
-"""
 import pandas as pd
 #df = pd.read_csv("/work3/s204503/bach-data/WLASL/WLASL_labels.csv")
 #ipt_dir = "/work3/s204503/bach-data/WLASL/WLASL2000"
@@ -192,7 +191,7 @@ df = pd.read_csv("data/WLASL/WLASL_labels.csv")
 ipt_dir = "data/WLASL/WLASL_videos"
 
 # pdb.set_trace()
-WLASL = WLASLDataset(df, ipt_dir, seq_len=64, grayscale=False)
+WLASL = WLASLDataset(df, ipt_dir, seq_len=64,train=True, grayscale=False)
 img1, trg_word = WLASL.__getitem__(8) # example of downsampling 72 --> 64
 print("FINAL SHAPE: ", img1.size())
 
@@ -206,7 +205,7 @@ imgs1_r[0].show()
 imgs1_r[20].show()
 imgs1_r[40].show()
 imgs1_r[60].show()
-"""
+
 
 
 """

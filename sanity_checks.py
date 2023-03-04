@@ -84,7 +84,7 @@ class WLASLDeterministicDataset(WLASLDataset):
     trg = torch.zeros(self.vocab_size) # 2000 unique words
     gloss_idx = self.df.iloc[idx]['label']
     trg[gloss_idx] = 1
-
+    
     return images, trg
 
 

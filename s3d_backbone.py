@@ -52,7 +52,7 @@ class VisualEncoder(nn.Module):
 # dim out --> n_frames/4 x 832
 
 # 12 different base.x 
-
+"""
 weights_filename = 'S3D_kinetics400.pt'
 default_wd = os.getcwd()
 model = VisualEncoder(2001)
@@ -69,6 +69,7 @@ model.eval()
 out = model(ipt).detach().numpy()
 print(f'pruned model output: {out.shape}')
 
+
 import pandas as pd
 from CTC_decoder.beam_search import beam_search
 
@@ -77,3 +78,4 @@ vocab = list(set(df['gloss']))
 
 e = beam_search(out, vocab)
 print(e)
+"""

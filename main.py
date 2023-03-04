@@ -190,13 +190,11 @@ def validate(model, dataloader, criterion, CFG):
     with torch.no_grad():
       ipt = ipt.cuda()
       trg = trg.cuda()
-      ipt_var = torch.autograd.Variable(ipt)
-      trg_var = torch.autograd.Variable(trg)
 
-      out = model(ipt_var)
+      out = model(ipt)
 
       probs = F.softmax(out, dim=1)
-      loss = criterion(probs, trg_var)
+      loss = criterion(probs, ipt)
       losses.append(loss.cpu())
 
       # compute model accuracy
