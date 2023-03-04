@@ -11,12 +11,24 @@ def getWLASL1000(df):
     count_dict = {word : len(df.loc[df['gloss'] == word]) for word in vocab}
     count_dict = dict(sorted(count_dict.items(), key=lambda x:x[1]))
     WLASL1000 = {'gloss' : [word for word, count in count_dict.items() if count == 10][:100]}
-    WLASL1000_df = df[df['gloss'].isin(WLASL1000['gloss'])]
+
+    df = df.drop(columns=['label'])
+
+    WLASL1000_df = df[df['gloss'].isin(WLASL1000['gloss'])].copy()
+
+    # create labels
+    words = list(sorted(set(WLASL1000_df['gloss'])))
+    labels = []
+    for i in range(len(WLASL1000_df)):
+        labels.append(words.index(WLASL1000_df.iloc[i]['gloss']))
+
+    WLASL1000_df['label'] = labels
 
     WLASL1000_df.to_csv('data/WLASL/WLASL1000_labels.csv')
     return WLASL1000_df
 
 
+df = getWLASL1000(df)
 """
 ---- The code below shows that classes are equally represented in train and test ----
 
