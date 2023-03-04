@@ -214,13 +214,6 @@ def validate(model, dataloader, criterion, CFG):
   return losses, acc
 
 
-def adjust_lr(optimizer, CFG):
-  decay_factor = 10
-  for param in optimizer.param_groups:
-    param['lr'] = param['lr'] / decay_factor
-    param['weight_decay'] = CFG.weight_decay
-
-
 def save_checkpoint(path, model, optimizer, epoch, train_losses, val_losses, train_accs, val_accs):
   # save a general checkpoint
   torch.save({'epoch' : epoch,
