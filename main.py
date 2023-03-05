@@ -220,6 +220,7 @@ def save_checkpoint(path, model, optimizer, epoch, train_losses, val_losses, tra
               }, path)
 
 def load_checkpoint(path, model, optimizer):
+  print("### Loading model from checkpoint ###")
   checkpoint = torch.load(path)
   model.load_state_dict(checkpoint['model_state_dict'])
   optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
