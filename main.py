@@ -40,7 +40,7 @@ class DataPathsWLASL1000:
 class cfg:
   def __init__(self):
     self.start_epoch = 0
-    self.n_epochs = 20
+    self.n_epochs = 40
     self.save_path = os.path.join('/work3/s204138/bach-models', 'trained_models')
     self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-14_epochs-7.037459_loss_0.004597_acc') # ! Fill empty string with model file name
     self.checkpoint = "See load path" # start from scratch, i.e. epoch 0
@@ -63,7 +63,7 @@ def main():
   #dp = DataPathsWLASL1000()
   #dp = DataPaths_dummy()
   CFG = cfg()
-
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   ############## load data ##############
   df = pd.read_csv(dp.wlasl_labels)
   img_folder = dp.wlasl_videos
@@ -76,8 +76,7 @@ def main():
 
   ############## initialize model and optimizer ##############
   n_classes = len(set(df['gloss'])) #2000
-  model = S3D(n_classes)
-  
+  model = S3D(n_classes).to(device)
   optimizer = optim.SGD(model.parameters(),
                         CFG.lr,
                         weight_decay=CFG.weight_decay,
@@ -86,6 +85,7 @@ def main():
   ############## Load weights ##############
   if CFG.checkpoint is None: # if no newer model, use basics => pretrained on kinetics
     model = load_model_weights(model, 'S3D_kinetics400.pt')
+    
     train_losses = []
     train_accs = []
     val_losses = []
@@ -104,7 +104,6 @@ def main():
     model = torch.nn.parallel.DistributedDataParallel(model)
   
   else:
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
     dataloaderTrain = DataLoader(WLASLtrain, batch_size=CFG.batch_size, 
                                    shuffle=True,
@@ -160,16 +159,16 @@ def train(model, dataloader, optimizer, criterion, CFG):
     loss = criterion(out, trg)
     losses.append(loss.detach().cpu())
 
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    
     # compute model accuracy
     _, preds = out.topk(1, 1, True, True)
     for j in range(len(preds)):
       if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
         acc += 1
 
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    
     end = time.time()
     if i % (CFG.print_freq) == 0:
       print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
