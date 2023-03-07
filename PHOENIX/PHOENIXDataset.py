@@ -1,6 +1,6 @@
 ##### Dataset class for Phoenix #####
 import os
-from Preprocess_PHOENIX import preprocess_df
+from preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
 from torch.utils import data
@@ -117,18 +117,16 @@ class PhoenixDataset(data.Dataset):
         
         else:
            images = transform_rgb(images)
-           images = self.DataAugmentation.HorizontalFlip(images)
-           images = self.DataAugmentations.CenterCrop(images)
+           # apply validation augmentations
 
         # make a one-hot vector for target class
-        sent_len = len(self.df.iloc[idx]['annotation'].split(' '))
+        trg_labels = self.df.iloc[idx]['gloss_labels']
 
-        trg = torch.zeros((sent_len, self.vocab_size)) # 2000 unique words
-        for i in range(sent_len):
-           trg[i]
-        gloss_idx = self.df.iloc[idx]['label']
-        trg[gloss_idx] = 1
-        
+
+        trg = torch.zeros((len(trg_labels), self.vocab_size)) # 2000 unique words
+        for i, item in enumerate(trg_labels):
+           trg[i] = item
+
         return images, trg
 
     
