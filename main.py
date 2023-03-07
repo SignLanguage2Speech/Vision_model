@@ -40,9 +40,9 @@ class DataPathsWLASL1000:
 class cfg:
   def __init__(self):
     self.start_epoch = 0
-    self.n_epochs = 40
+    self.n_epochs = 90
     self.save_path = os.path.join('/work3/s204138/bach-models', 'trained_models')
-    self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-14_epochs-7.037459_loss_0.004597_acc') # ! Fill empty string with model file name
+    self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-69_epochs-3.397701_loss_0.290858_acc') # ! Fill empty string with model file name
     self.checkpoint = "See load path" # start from scratch, i.e. epoch 0
     # self.checkpoint = True # start from checkpoint set in self.load_path
     self.batch_size = 6 # per GPU (they have 56 haha)
@@ -108,11 +108,11 @@ def main():
     dataloaderTrain = DataLoader(WLASLtrain, batch_size=CFG.batch_size, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
-    dataloaderVal = DataLoader(WLASLval, batch_size=CFG.batch_size, 
+    dataloaderVal = DataLoader(WLASLval, batch_size=1, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
     # TODO actually use this 🤡
-    dataloaderTest = DataLoader(WLASLtest, batch_size=CFG.batch_size, 
+    dataloaderTest = DataLoader(WLASLtest, batch_size=1, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
     print(f"Model is on device: {device}")
@@ -154,7 +154,7 @@ def train(model, dataloader, optimizer, criterion, CFG):
 
     ipt = ipt.cuda()
     trg = trg.cuda()
-    
+
     out = model(ipt)
     loss = criterion(out, trg)
     losses.append(loss.detach().cpu())
@@ -171,7 +171,7 @@ def train(model, dataloader, optimizer, criterion, CFG):
 
     end = time.time()
     if i % (CFG.print_freq) == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / (CFG.batch_size*(i+1)):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
   print(f"Final training accuracy: {acc}")
@@ -188,6 +188,7 @@ def validate(model, dataloader, criterion, CFG):
 
       ipt = ipt.cuda()
       trg = trg.cuda()
+      #print(f"Input size: {ipt.size()}")
 
       out = model(ipt)
       loss = criterion(out, trg)
@@ -200,7 +201,7 @@ def validate(model, dataloader, criterion, CFG):
       
       end = time.time()
       if i % (CFG.print_freq/2) == 0:
-        print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc / len(dataloader.dataset):.4f}\nTime: {(end - start)/60:.4f} min")
+        print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nCurrent accuracy: {acc /(i+1):.4f}\nTime: {(end - start)/60:.4f} min")
 
   acc = acc/len(dataloader.dataset)
   print(f"Final validation accuracy: {acc}")
