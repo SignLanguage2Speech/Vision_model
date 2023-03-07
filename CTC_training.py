@@ -3,7 +3,7 @@ import pandas as pd
 import time
 import torch
 import torch.nn as nn
-from s3d_backbone import VisualEncoder
+from Vision_model.visual_encoder import VisualEncoder
 from torch.utils.data import DataLoader
 
 class cfg:

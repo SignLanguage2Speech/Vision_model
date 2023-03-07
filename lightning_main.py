@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from lightning_model import S3D_lightning
+from Vision_model.lightning_s3d import S3D_lightning
 
 import pandas as pd
 from main import DataPaths
