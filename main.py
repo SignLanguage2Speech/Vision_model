@@ -40,9 +40,9 @@ class DataPathsWLASL1000:
 class cfg:
   def __init__(self):
     self.start_epoch = 0
-    self.n_epochs = 90
+    self.n_epochs = 100
     self.save_path = os.path.join('/work3/s204138/bach-models', 'trained_models')
-    self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-69_epochs-3.397701_loss_0.290858_acc') # ! Fill empty string with model file name
+    self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/SS3D_WLASL-72_epochs-3.403989_loss_0.286517_acc') # ! Fill empty string with model file name
     self.checkpoint = "See load path" # start from scratch, i.e. epoch 0
     # self.checkpoint = True # start from checkpoint set in self.load_path
     self.batch_size = 6 # per GPU (they have 56 haha)
