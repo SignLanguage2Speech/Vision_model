@@ -4,8 +4,6 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.WLASLDataset import transform_rgb 
-from utils.load_weigths import load_model_weights
 from model import S3D, SepConv3d, BasicConv3d, Mixed_3b, Mixed_3c, Mixed_4b, Mixed_4c, Mixed_4d, Mixed_4e, Mixed_4f
 
 class VisualEncoder(nn.Module):

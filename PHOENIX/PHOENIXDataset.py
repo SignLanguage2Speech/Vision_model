@@ -1,6 +1,6 @@
 ##### Dataset class for Phoenix #####
 import os
-from preprocess_PHOENIX import preprocess_df
+from PHOENIX.preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
 from torch.utils import data
@@ -76,22 +76,28 @@ def downsample(images, seq_len):
 def load_imgs(ipt_dir):
   image_names = os.listdir(ipt_dir)
   N = len(image_names)
-  imgs = np.empty((N, 210, 260, 3))
+  imgs = np.empty((N, 260, 210, 3))
 
   for i in range(N):
     imgs[i,:,:,:] = np.asarray(Image.open(os.path.join(ipt_dir, image_names[i])))
   
   return imgs
   
-
+"""
+df : Phoenix dataframe (train, dev or test)
+ipt dir : Directory with videos associated to df
+vocab size : number of unique glosses/words in df
+seq_len : length to be upsampled to during training.
+split : 'train', 'dev' or 'test'
+"""
 
 class PhoenixDataset(data.Dataset):
-    def __init__(self, df, ipt_dir, vocab_size, seq_len=64, train=True):
+    def __init__(self, df, ipt_dir, vocab_size, seq_len=64, split='train'):
         super().__init__()
         self.df = preprocess_df(df, save=False, save_name=None)
         self.ipt_dir = ipt_dir
         self.seq_len = seq_len
-        self.train = train
+        self.split=split
         self.vocab_size = vocab_size
         self.video_folders = list(self.df['name'])
 
@@ -99,10 +105,10 @@ class PhoenixDataset(data.Dataset):
 
         ### Assumes that within a sample (id column in df) there is only one folder named '1' ###
         # TODO Check that this holds!
-        image_folder = os.path.join(self.ipt_dir, self.video_folders[idx])
+        image_folder = os.path.join(self.ipt_dir, self.split, self.video_folders[idx])
         images = load_imgs(image_folder)
 
-        if self.train:
+        if self.split == 'train':
           images = transform_rgb(images) # convert to tensor, reshape and normalize 
           # resize images
           # take a crop in range [0.7, 1.]
@@ -114,7 +120,8 @@ class PhoenixDataset(data.Dataset):
           # check if we need to downsample
           elif self.seq_len < images.size(1):
             images = downsample(images, self.seq_len)
-        
+          
+        # split == 'dev' or 'test'
         else:
            images = transform_rgb(images)
            # apply validation augmentations

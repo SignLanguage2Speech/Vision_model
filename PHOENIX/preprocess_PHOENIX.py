@@ -55,6 +55,9 @@ def getLabels(df, t_vocab, g_vocab):
 
     return df
 
+
+"""
+########## TEST ##########
 annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
 
@@ -65,3 +68,5 @@ test = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.test.corpus.cs
 val = preprocess_df(val)
 
 print(val.head(5))
+
+"""
