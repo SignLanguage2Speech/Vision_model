@@ -1,16 +1,11 @@
 import pytorch_lightning as pl
-from lightning_s3d import S3D_lightning
+from lightning_ctc import VisualEncoder_lightning
 
 import pandas as pd
-from main import DataPaths
 
 def main():
-    dp = DataPaths()
-    df = pd.read_csv(dp.wlasl_labels)
-    n_classes = len(set(df['gloss'])) #2000
-
     # init model
-    model = S3D_lightning(n_classes)
+    model = VisualEncoder_lightning()
     
     # trainer = pl.Trainer(accelerator='gpu', devices=2)
     trainer = pl.Trainer()
