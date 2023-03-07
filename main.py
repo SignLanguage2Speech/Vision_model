@@ -13,6 +13,7 @@ from utils.WLASLDataset import WLASLDataset
 from model import S3D
 from utils.load_weigths import load_model_weights
 
+import pytorch_lightning as pl
 
 import pdb
 
@@ -42,7 +43,7 @@ class cfg:
     self.start_epoch = 0
     self.n_epochs = 40
     self.save_path = os.path.join('/work3/s204138/bach-models', 'trained_models')
-    self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-14_epochs-7.037459_loss_0.004597_acc') # ! Fill empty string with model file name
+    self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-42_epochs-3.846348_loss_0.222165_acc') # ! Fill empty string with model file name
     self.checkpoint = "See load path" # start from scratch, i.e. epoch 0
     # self.checkpoint = True # start from checkpoint set in self.load_path
     self.batch_size = 6 # per GPU (they have 56 haha)
@@ -143,7 +144,9 @@ def main():
     fname = os.path.join(CFG.save_path, f'S3D_WLASL-{epoch+1}_epochs-{np.mean(val_loss):.6f}_loss_{val_acc:5f}_acc')
     save_checkpoint(fname, model, optimizer, epoch, train_losses, val_losses, train_accs, val_accs)
     
-    
+
+
+
 def train(model, dataloader, optimizer, criterion, CFG):
   losses = []
   model.train()
@@ -151,11 +154,11 @@ def train(model, dataloader, optimizer, criterion, CFG):
   acc = 0
   print("################## Starting training ##################")
   for i, (ipt, trg) in enumerate(dataloader):
-
     ipt = ipt.cuda()
     trg = trg.cuda()
     
     out = model(ipt)
+    # pdb.set_trace()
     loss = criterion(out, trg)
     losses.append(loss.detach().cpu())
 
@@ -164,7 +167,9 @@ def train(model, dataloader, optimizer, criterion, CFG):
     optimizer.step()
     
     # compute model accuracy
-    _, preds = out.topk(1, 1, True, True)
+    # pdb.set_trace()
+    _, preds = out.topk(1, 1, True, True) # top 1
+    # _, preds = out.topk(5, 1, True, True) # top 5
     for j in range(len(preds)):
       if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
         acc += 1
