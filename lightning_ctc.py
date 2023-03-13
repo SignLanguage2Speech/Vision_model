@@ -18,7 +18,7 @@ class cfg:
         self.batch_size = 8
         # self.momentum = -1000 # TODO look up value
         self.epsilon = -1000  # TODO look up value
-        self.model_path = '/work3/s204138/bach-models/trained_models/S3D_WLASL-69_epochs-3.397701_loss_0.290858_acc'
+        self.model_path = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc'
         # self.model_path = None
 
 class PhoenixPaths:

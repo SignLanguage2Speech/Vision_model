@@ -148,6 +148,13 @@ class WLASLDataset(data.Dataset):
         images = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally with 50% prob
         images = self.DataAugmentation.RandomCrop(images) # take a random 224 x 224 crop
         images = self.DataAugmentation.RandomRotation(images) # randomly rotate image +- 5 degrees'
+        
+		# Check if we need to upsample
+        if self.seq_len > images.size(1): 
+          images = upsample(images, self.seq_len)
+
+        elif self.seq_len < images.size(1): #downsample to reach seq_len
+          images = downsample(images, self.seq_len)
 
       # validation/test dataset
       else:
@@ -156,13 +163,8 @@ class WLASLDataset(data.Dataset):
         images = self.DataAugmentation.HorizontalFlip(images) # flip images horizontally wiyh 50% prob
         images = self.DataAugmentation.CenterCrop(images) # center crop 224 x 224
         
-    # Check if we need to upsample
-    if self.seq_len > images.size(1): 
-      images = upsample(images, self.seq_len)
-    
-    # Check if we need to downsample
-    elif self.seq_len < images.size(1): #downsample to reach seq_len
-      images = downsample(images, self.seq_len)
+        if images.size(1) <= 12:
+          images = upsample(images, 13)
 
     # pdb.set_trace()
     # make a one-hot vector for target class
