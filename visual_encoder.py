@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from model import S3D, SepConv3d, BasicConv3d, Mixed_3b, Mixed_3c, Mixed_4b, Mixed_4c, Mixed_4d, Mixed_4e, Mixed_4f
 
+import pdb
+
 class VisualEncoder(nn.Module):
     def __init__(self, n_classes:int):
         super().__init__()
@@ -24,8 +26,9 @@ class VisualEncoder(nn.Module):
             Mixed_4d(),
             Mixed_4e(),
             Mixed_4f())
+        
         ### Model head ###
-        self.head1 = nn.Sequential(nn.Linear(832, 832),
+        self.head1 = nn.Sequential(nn.Linear(16, 16),
                                   nn.BatchNorm1d(832),
                                   nn.ReLU())
         self.head2 = nn.Sequential(nn.Conv1d(832, 512, kernel_size=3, stride=1, padding=1))
@@ -39,10 +42,10 @@ class VisualEncoder(nn.Module):
     def forward(self, x):
         y = self.base(x)
         y = F.avg_pool3d(y, (1, y.size(3), y.size(4)), stride=1) # TODO Evaluate if this is equivalent to "spatial pooling".
-        y = y.squeeze().T # remove all single dims and transpose
-        y = self.head1(y).T
-        y = self.head2(y).T
-        y = self.translation_layer(y)
+        y = y.view(-1,y.shape[1],y.shape[2])
+        y = self.head1(y)
+        y = self.head2(y)
+        y = self.translation_layer(y.view(-1,y.shape[2],y.shape[1]))
         return y
 
 

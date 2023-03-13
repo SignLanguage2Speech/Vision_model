@@ -13,7 +13,7 @@ def main():
     model = S3D_lightning(n_classes)
     
     # trainer = pl.Trainer(accelerator='gpu', devices=2)
-    trainer = pl.Trainer()
+    trainer = pl.Trainer(accelerator='gpu', devices=1)
     trainer.fit(model)
 
 if __name__ == '__main__':

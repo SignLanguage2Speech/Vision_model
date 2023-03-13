@@ -9,6 +9,7 @@ import pandas as pd
 import subprocess
 from PIL import Image
 
+import pdb
 
 def transform_rgb(video):
   ''' stack & normalization '''
@@ -100,6 +101,7 @@ class PhoenixDataset(data.Dataset):
         self.split=split
         self.vocab_size = vocab_size
         self.video_folders = list(self.df['name'])
+        self.MAX_TARGET_SEQUENCE_LEN = 30 # maximal length of target gloss sequence
 
     def __getitem__(self, idx):
 
@@ -126,15 +128,20 @@ class PhoenixDataset(data.Dataset):
            images = transform_rgb(images)
            # apply validation augmentations
 
-        # make a one-hot vector for target class
         trg_labels = self.df.iloc[idx]['gloss_labels']
+        trg_length = len(trg_labels)
+        pad = torch.nn.ConstantPad1d((0,self.MAX_TARGET_SEQUENCE_LEN - trg_length), value=0)
+        trg = pad(torch.tensor(trg_labels))
+        
+        # # make a one-hot vector for target class
+        # trg_labels = self.df.iloc[idx]['gloss_labels']
 
+        # trg = torch.zeros(self.MAX_TARGET_SEQUENCE_LEN, self.vocab_size) # zero-padded length of gloss sequence with 2000 unique "words"
+        # trg_length = len(trg_labels)                                     # pass length up until zero-padding (required by CTC loss interface)
+        # for i, item in enumerate(trg_labels):
+        #    trg[i,item] = 1
 
-        trg = torch.zeros((len(trg_labels), self.vocab_size)) # 2000 unique words
-        for i, item in enumerate(trg_labels):
-           trg[i] = item
-
-        return images, trg
+        return images, (trg, trg_length)
 
     
     def __len__(self):

@@ -1,8 +1,8 @@
 import os
 import torch
 
-from lightning_ctc import VisualEncoder_lightning
-from visual_encoder import VisualEncoder
+# from lightning_ctc import VisualEncoder_lightning
+# from visual_encoder import VisualEncoder
 
 import pdb
 
@@ -14,7 +14,7 @@ def load_model_weights(model, weight_filename=None, verbose=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
     # pdb.set_trace()
     weights = torch.load(weight_filename)#, map_location=torch.device(device))
-    pdb.set_trace()
+    # pdb.set_trace()
     sd = model.state_dict()
 
     for name, param in weights['model_state_dict'].items():

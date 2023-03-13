@@ -2,8 +2,11 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch.nn as nn
+import torch
 import pandas as pd
 import os
+
+import pdb
 
 from PHOENIX.PHOENIXDataset import PhoenixDataset
 from load_wlasl_weights import load_model_weights
@@ -15,7 +18,7 @@ class cfg:
         self.n_epochs = 80
         self.init_lr = 1e-3
         self.weight_decay = 1e-3
-        self.batch_size = 8
+        self.batch_size = 2
         # self.momentum = -1000 # TODO look up value
         self.epsilon = -1000  # TODO look up value
         self.model_path = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc'
@@ -47,24 +50,25 @@ class VisualEncoder_lightning(pl.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_num):
-        x,y = batch
-        n_batch = len(x)
-        out = self.model(x)
-        # pdb.set_trace()
-        loss = self.criterion(out, y)
-
+        x,(y,target_lengths) = batch
+        out = torch.log(self.model(x))
+        # out = self.model(x)
+        log_probs = out.view(out.shape[1],out.shape[0],out.shape[2])
+        input_lengths = torch.full(size=(out.shape[0],), fill_value=out.shape[1])
+        loss = self.criterion(log_probs=log_probs, targets=y, input_lengths=(input_lengths), target_lengths=(target_lengths))
+        pdb.set_trace()
         return {'loss': loss}
     
     def configure_optimizers(self):
         return self.optimizer if self.optimizer is not None else \
             optim.Adam(self.model.parameters(),
-                    self.cfg.lr,
+                    self.cfg.init_lr,
                     weight_decay=self.cfg.weight_decay)
 
     def get_dataloader(self, split_type) -> DataLoader:
         df = pd.read_csv(os.path.join(self.dp.phoenix_labels, f'PHOENIX-2014-T.{split_type}.corpus.csv'), delimiter = '|')
         dataset = PhoenixDataset(df, self.dp.phoenix_videos, self.vocab_size, seq_len=64, split=split_type)
-        return DataLoader(dataset)
+        return DataLoader(dataset, batch_size=self.cfg.batch_size if split_type=='train' else 1)
     
     def train_dataloader(self) -> DataLoader:
         return self.get_dataloader('train')

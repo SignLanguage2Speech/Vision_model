@@ -7,8 +7,14 @@ def main():
     # init model
     model = VisualEncoder_lightning()
     
-    # trainer = pl.Trainer(accelerator='gpu', devices=2)
-    trainer = pl.Trainer()
+    num_gpu = 1
+    ckpt_path = None#"some/path/to/my_checkpoint.ckpt"
+
+    trainer = pl.Trainer(
+        # accelerator='gpu', 
+        # devices=num_gpu,
+        # ckpt_path=ckpt_path # full-state checkpoint
+        )
     trainer.fit(model)
 
 if __name__ == '__main__':
