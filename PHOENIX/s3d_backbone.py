@@ -24,10 +24,11 @@ class VisualEncoder(nn.Module):
             Mixed_4d(),
             Mixed_4e(),
             Mixed_4f())
+        
         ### Model head ###
-        self.head1 = nn.Sequential(nn.Linear(832, 832),
-                                  nn.BatchNorm1d(832),
-                                  nn.ReLU())
+        self.head1 = nn.Sequential(nn.Linear(16, 16),
+                                   nn.BatchNorm1d(832),
+                                   nn.ReLU())
         self.head2 = nn.Sequential(nn.Conv1d(832, 512, kernel_size=3, stride=1, padding=1))
 
         ### Linear translation layer ###
@@ -39,17 +40,51 @@ class VisualEncoder(nn.Module):
     def forward(self, x):
         y = self.base(x)
         y = F.avg_pool3d(y, (1, y.size(3), y.size(4)), stride=1) # TODO Evaluate if this is equivalent to "spatial pooling".
-        y = y.squeeze().T # remove all single dims and transpose
-        y = self.head1(y).T
-        y = self.head2(y).T
-        y = self.translation_layer(y)
+        y = y.view(-1, y.size(1), y.size(2)) # collapse singleton dimensions
+        y = self.head1(y)
+        y = self.head2(y)
+        y = self.translation_layer(y.view(-1, y.size(2), y.size(1))) # reshape for linear layer
         return y
 
+"""
+import pandas as pd
+from utils.load_weigths import load_model_weights
+from utils.WLASLDataset import WLASLDataset
+import torch.utils.data as data
 
-# dim in --> n_frames x 224 x 224 x 3
-# dim out --> n_frames/4 x 832
+class DataPaths:
+  def __init__(self):
+    self.wlasl_videos = "/work3/s204138/bach-data/WLASL/WLASL2000"
+    self.wlasl_labels = "/work3/s204138/bach-data/WLASL/WLASL_labels.csv"
 
-# 12 different base.x 
+dp = DataPaths()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+model = VisualEncoder(2001)
+model = load_model_weights(model, 'S3D_kinetics400.pt')#.to(device)
+print("model loaded")
+
+df = pd.read_csv(dp.wlasl_labels)
+img_folder = dp.wlasl_videos
+
+# get datasets
+WLASLtrain = WLASLDataset(df.loc[df['split']=='train'], img_folder, seq_len=64, train=True, grayscale=False)
+
+dataloaderTrain = data.DataLoader(WLASLtrain, batch_size=1, 
+                                   shuffle=True,
+                                   num_workers=0)
+
+with torch.no_grad():
+    for i, (ipt, trg) in enumerate(dataloaderTrain):
+        #ipt = ipt.cuda()
+        #trg = trg.cuda()
+        out = model(ipt)
+        print(f"Out size: {out.size()}")
+
+"""
+
+
+   
 """
 weights_filename = 'S3D_kinetics400.pt'
 default_wd = os.getcwd()
