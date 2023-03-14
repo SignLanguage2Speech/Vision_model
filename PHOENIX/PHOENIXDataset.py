@@ -29,13 +29,20 @@ def revert_transform_rgb(clip):
 ############# Data augmentations #############
 class DataAugmentations:
   def __init__(self):
+    self.H_upsample = 298
+    self.W_upsample = 240
     self.H_out = 224
     self.W_out = 224
+
+  def UpsamplePixels(self, imgs: np.ndarray):
+    Upsample = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
+    imgs = Upsample(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
+    return imgs.permute(0, 2, 3, 1).numpy() # return and revert dim changes
 
   # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
     p = np.random.randint(0, 2)
-    if p < 2: # TODO update this value after testing !!!
+    if p < 2:
       imgs = torchvision.transforms.functional.hflip(imgs)
     return imgs
   
@@ -102,6 +109,7 @@ class PhoenixDataset(data.Dataset):
         self.vocab_size = vocab_size
         self.video_folders = list(self.df['name'])
         self.MAX_TARGET_SEQUENCE_LEN = 30 # maximal length of target gloss sequence
+        self.DataAugmentation = DataAugmentations()
 
     def __getitem__(self, idx):
 
@@ -111,10 +119,11 @@ class PhoenixDataset(data.Dataset):
         images = load_imgs(image_folder)
 
         if self.split == 'train':
-          images = transform_rgb(images) # convert to tensor, reshape and normalize 
-          # resize images
-          # take a crop in range [0.7, 1.]
-          # frame rate augmentation
+          images = self.DataAugmentation.UpsamplePixels(images)
+          images = transform_rgb(images) # convert to tensor, reshape and normalize
+          images = self.DataAugmentation.HorizontalFlip(images)
+          images = self.DataAugmentation.RandomCrop(images)
+          images = self.DataAugmentation.RandomRotation(images)
 
           # check if we need to upsample
           if self.seq_len > images.size(1): 
@@ -125,13 +134,15 @@ class PhoenixDataset(data.Dataset):
           
         # split == 'dev' or 'test'
         else:
+           images = self.DataAugmentation.UpsamplePixels(images)
            images = transform_rgb(images)
+           images = self.DataAugmentation.CenterCrop(images)
            # apply validation augmentations
 
         trg_labels = self.df.iloc[idx]['gloss_labels']
         trg_length = len(trg_labels)
         pad = torch.nn.ConstantPad1d((0,self.MAX_TARGET_SEQUENCE_LEN - trg_length), value=0) # ! blank index as padding
-        trg = pad(torch.tensor(trg_labels))
+        trg = pad(torch.tensor(trg_labels, dtype=torch.long))
         
         # # make a one-hot vector for target class
         # trg_labels = self.df.iloc[idx]['gloss_labels']
