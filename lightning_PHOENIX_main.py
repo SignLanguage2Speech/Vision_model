@@ -11,8 +11,8 @@ def main():
     ckpt_path = None#"some/path/to/my_checkpoint.ckpt"
 
     trainer = pl.Trainer(
-        # accelerator='gpu', 
-        # devices=num_gpu,
+        accelerator='gpu', 
+        devices=num_gpu,
         # ckpt_path=ckpt_path # full-state checkpoint
         )
     trainer.fit(model)
