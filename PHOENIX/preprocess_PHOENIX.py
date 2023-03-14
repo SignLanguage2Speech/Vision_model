@@ -15,8 +15,8 @@ def preprocess_df(df, save=False, save_name = "PHOENIX_train_preprocessed.csv"):
     translations = list(train['translation']) #+ list(test['translation']) + list(val['translation'])
     translations = list(sorted(set([word for sent in translations for word in sent.replace(chars,'').split(' ')])))
     
-    gloss_vocab = {word: glosses.index(word+1) for word in glosses}
-    translation_vocab = {word: translations.index(word+1) for word in translations}
+    gloss_vocab = {word: glosses.index(word)+1 for word in glosses}
+    translation_vocab = {word: translations.index(word)+1 for word in translations}
 
     # add translation and gloss labels
     df = getLabels(df, translation_vocab, gloss_vocab)
