@@ -28,7 +28,7 @@ class VisualEncoder(nn.Module):
             Mixed_4f())
         
         ### Model head ###
-        self.head1 = nn.Sequential(nn.Linear(16, 16),
+        self.head1 = nn.Sequential(nn.Linear(32, 32), # ! T/4 = self.cfg.seq_len / 4
                                   nn.BatchNorm1d(832),
                                   nn.ReLU())
         self.head2 = nn.Sequential(nn.Conv1d(832, 512, kernel_size=3, stride=1, padding=1))
@@ -36,12 +36,13 @@ class VisualEncoder(nn.Module):
         ### Linear translation layer ###
         self.translation_layer = nn.Sequential(nn.Linear(512, n_classes), 
                                                nn.ReLU(),
-                                               nn.Softmax(dim=-1))
+                                               nn.LogSoftmax(dim=-1)) # ! changed to LogSoftmax
         
 
     def forward(self, x):
         y = self.base(x)
         y = F.avg_pool3d(y, (1, y.size(3), y.size(4)), stride=1) # TODO Evaluate if this is equivalent to "spatial pooling".
+        # pdb.set_trace()
         y = y.view(-1,y.shape[1],y.shape[2])
         y = self.head1(y)
         y = self.head2(y)

@@ -38,26 +38,39 @@ class VisualEncoder_lightning(pl.LightningModule):
         df = pd.read_csv(os.path.join(self.dp.phoenix_labels, f'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
         glosses = set([word for sent in df['orth'] for word in sent.split(' ')])
         self.vocab_size = len(glosses)
-        self.model = VisualEncoder(self.vocab_size + 1)     # ? number of classes is vocab_size + the blank character
+        self.model = VisualEncoder(self.vocab_size+1)     # ? number of classes is vocab_size + the blank character
 
         # initialize model with pretrained S3D backbone
         self.model = load_model_weights(self.model, self.cfg.model_path) if self.cfg.model_path is not None else self.model
 
         self.criterion = nn.CTCLoss(blank=self.vocab_size, zero_infinity=True)  # ? blank character is indexed as last
+        # self.criterion = nn.CTCLoss(blank=self.vocab_size, reduction='sum', zero_infinity=True)  # ? blank character is indexed as last
 
         self.optimizer = None # TODO implement loading from checkpoint
+
+        # self.automatic_optimization = False # ! For debugging
 
     def forward(self, x):
         return self.model(x)
 
+    # def manual_backward(self, loss: torch.Tensor, *args, **kwargs) -> None:
+    #     pdb.set_trace()
+    #     loss.backward()
+
     def training_step(self, batch, batch_num):
         x,(y,target_lengths) = batch
-        out = torch.log(self.model(x))
-        # out = self.model(x)
+        # out = torch.log(self.model(x))
+        out = self.model(x)
         log_probs = out.view(out.shape[1],out.shape[0],out.shape[2])
         input_lengths = torch.full(size=(out.shape[0],), fill_value=out.shape[1])
+
+        # opt = self.optimizers()
+        # opt.zero_grad()
         loss = self.criterion(log_probs=log_probs, targets=y, input_lengths=(input_lengths), target_lengths=(target_lengths))
-        pdb.set_trace()
+        # self.manual_backward(loss)
+        # opt.step()
+
+        # print(loss)
         return {'loss': loss}
     
     def configure_optimizers(self):

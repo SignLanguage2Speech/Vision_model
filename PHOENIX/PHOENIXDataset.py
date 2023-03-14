@@ -93,7 +93,7 @@ split : 'train', 'dev' or 'test'
 """
 
 class PhoenixDataset(data.Dataset):
-    def __init__(self, df, ipt_dir, vocab_size, seq_len=64, split='train'):
+    def __init__(self, df, ipt_dir, vocab_size, seq_len=128, split='train'):
         super().__init__()
         self.df = preprocess_df(df, save=False, save_name=None)
         self.ipt_dir = ipt_dir
@@ -130,7 +130,7 @@ class PhoenixDataset(data.Dataset):
 
         trg_labels = self.df.iloc[idx]['gloss_labels']
         trg_length = len(trg_labels)
-        pad = torch.nn.ConstantPad1d((0,self.MAX_TARGET_SEQUENCE_LEN - trg_length), value=0)
+        pad = torch.nn.ConstantPad1d((0,self.MAX_TARGET_SEQUENCE_LEN - trg_length), value=0) # ! blank index as padding
         trg = pad(torch.tensor(trg_labels))
         
         # # make a one-hot vector for target class
