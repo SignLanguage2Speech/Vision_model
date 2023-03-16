@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import time
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -64,27 +65,25 @@ def main():
 
     criterion = torch.nn.CTCLoss(blank=0, zero_infinity=False).to(device) # zero_infinity is for debugging purposes only...
 
-
     dataloaderTrain = DataLoader(PhoenixTrain, batch_size=CFG.batch_size, 
                                    shuffle=True,
                                    num_workers=CFG.num_workers)
     dataloaderVal = DataLoader(PhoenixVal, batch_size=1, 
-                                   shuffle=True,
+                                   shuffle=False,
                                    num_workers=CFG.num_workers)
     # TODO actually use this 🤡
     dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
-                                   shuffle=True,
+                                   shuffle=False,
                                    num_workers=CFG.num_workers)
     
     print(f"Model is on device: {device}")
     model.to(device)  
-    train_losses, train_accs = [], []
 
     CTC_decoder = ctc_decoder(
     lexicon=None,       # not using language model
     lm_dict=None,       # not using language model
     lm=None,            # not using language model
-    tokens= ['-'] + [str(i+1) for i in range(CFG.VOCAB_SIZE)] + ['|'],
+    tokens= ['-'] + [str(i+1) for i in range(CFG.VOCAB_SIZE)] + ['|'], # vocab + blank and split
     nbest=1, # number of hypotheses to return
     beam_size=10,       # n.o competing hypotheses at each step
     beam_size_token=20,  # top_n tokens to consider at each step
@@ -108,8 +107,8 @@ def main():
       val_WERS.append(val_WER)
 
       ### Save checkpoint ###
-      #fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_acc')
-      #save_checkpoint(fname, model, optimizer, i+1, train_losses, val_losses, train_WERS, val_WERS)
+      fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_acc')
+      save_checkpoint(fname, model, optimizer, i+1, train_losses, val_losses, train_WERS, val_WERS)
 
 def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
   losses = []
@@ -134,7 +133,7 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
                      input_lengths=ipt_len,
                      target_lengths=trg_len.long().cpu())
     
-    losses.append(loss.detach().cpu())
+    losses.append(loss.detach().cpu().item())
 
     optimizer.zero_grad()
     loss.backward()
@@ -149,8 +148,10 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
     end = time.time()
     if i % (CFG.print_freq) == 0:
       print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
+    
+    
   
-  print(f"FINAL AVG WER: {np.mean(WERS)}")
+  #print(f"FINAL AVG WER: {np.mean(WERS)}")
   return losses, WERS
 
 def validate(model, dataloader, criterion, decoder, CFG):
@@ -161,11 +162,12 @@ def validate(model, dataloader, criterion, decoder, CFG):
   print("################## Starting validation ##################")
   for i, (ipt, trg, trg_len) in enumerate(dataloader):
     with torch.no_grad():
-
+      #print("ipt", ipt.size())
       ipt = ipt.cuda()
       #trg = trg.cuda()
-
-      out = torch.log(model(ipt))
+      
+      out = torch.log(model(ipt)+1e-16) # add small constant to avoid nan
+      print("Out mean: ", torch.mean(out))
       ipt_len = torch.full(size=(1,), fill_value=out.size(2), dtype=torch.long)
       trg = trg[0][:trg_len[0]]
       loss = criterion(out.view(out.size(2), out.size(0), out.size(1)), 
@@ -173,6 +175,7 @@ def validate(model, dataloader, criterion, decoder, CFG):
                       input_lengths=ipt_len,
                       target_lengths=trg_len.long().cpu())
 
+      losses.append(loss.detach().cpu().item())
       
       out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
       preds = [p[0].tokens if len(p[0].tokens) > 0 else 1086 for p in out_d]
@@ -183,7 +186,7 @@ def validate(model, dataloader, criterion, decoder, CFG):
       end = time.time()
       if i % (CFG.print_freq/2) == 0:
         print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
-
+     
   print(f"FINAL AVG WER: {np.mean(WERS)}")
   return losses, WERS
 
