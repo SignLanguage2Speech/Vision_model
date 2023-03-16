@@ -41,24 +41,14 @@ def getLabels(df, t_vocab, g_vocab):
         for word in T:
             try:
                 T_labels.append(t_vocab[word])
-<<<<<<< Updated upstream
-            except KeyError: # OOV
-                T_labels.append(None)
-=======
             except KeyError:
                 T_labels.append(1086) # TODO Figure out how to handle OOV in validation & test
->>>>>>> Stashed changes
         
         for gloss in G:
             try:
                 G_labels.append(g_vocab[gloss])
-<<<<<<< Updated upstream
-            except KeyError: # OOV
-                G_labels.append(None)
-=======
             except KeyError:
                 G_labels.append(1086) # TODO Figure out how to handle OOV in validation & test
->>>>>>> Stashed changes
                 
         all_translations.append(T_labels)
         all_glosses.append(G_labels)

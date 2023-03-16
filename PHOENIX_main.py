@@ -2,10 +2,6 @@ import os
 import numpy as np
 import pandas as pd
 import time
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -104,23 +100,6 @@ def main():
       # run train loop
       train_loss, train_WER = train(model, dataloaderTrain, optimizer, criterion, scheduler, CTC_decoder, CFG)
       train_losses.append(train_loss)
-<<<<<<< Updated upstream
-      train_accs.append(train_acc)
-
-def train(model, dataloader, optimizer, criterion, CFG):
-  losses = []
-  model.train()
-  start = time.time()
-  acc = 0
-  print("################## Starting training ##################")
-  for i, (ipt, trg) in enumerate(dataloader):
-
-    ipt = ipt.cuda()
-    trg = trg.cuda()
-
-    out = model(ipt)
-    loss = criterion(out, trg)
-=======
       train_WERS.append(train_WER)
 
       # run validation loop
@@ -155,29 +134,11 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
                      input_lengths=ipt_len,
                      target_lengths=trg_len.long().cpu())
     
->>>>>>> Stashed changes
     losses.append(loss.detach().cpu())
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-<<<<<<< Updated upstream
-    
-    # compute model accuracy
-    _, preds = out.topk(1, 1, True, True)
-    for j in range(len(preds)):
-      if preds[j] == np.where(trg.cpu()[j] == 1)[0][0]:
-        acc += 1
-
-    end = time.time()
-    if i % (CFG.print_freq) == 0:
-      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nTime: {(end - start)/60:.4f} min")
-
-  
-  print(f"Final training accuracy: {acc}")
-  return losses
-
-=======
     scheduler.step()
 
     out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
@@ -248,7 +209,6 @@ def TokensToSent(vocab, tokens):
 
 if __name__ == '__main__':
   main()
->>>>>>> Stashed changes
 
 
 
