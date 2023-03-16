@@ -3,23 +3,7 @@ import pandas as pd
 
 def preprocess_df(df, save=False, save_name = "PHOENIX_train_preprocessed.csv"):
     annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
-<<<<<<< Updated upstream
-    train = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
-    chars = '?.,!-_+'
-
-    # get vocabulary for translations and glosses for the train dataset
-    glosses = list(train['orth']) #+ list(test['orth']) + list(val['orth'])
-    glosses = list(sorted(set([word for sent in glosses for word in sent.replace(chars,'').split(' ')])))
-    print(f"Gloss vocab size: {len(glosses)}")
-
-    translations = list(train['translation']) #+ list(test['translation']) + list(val['translation'])
-    translations = list(sorted(set([word for sent in translations for word in sent.replace(chars,'').split(' ')])))
-    
-    gloss_vocab = {word: glosses.index(word)+1 for word in glosses}
-    translation_vocab = {word: translations.index(word)+1 for word in translations}
-=======
     gloss_vocab, translation_vocab = getVocab(annotations_path)
->>>>>>> Stashed changes
 
     # add translation and gloss labels
     df = getLabels(df, translation_vocab, gloss_vocab)

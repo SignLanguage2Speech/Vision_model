@@ -26,13 +26,8 @@ class VisualEncoder(nn.Module):
             Mixed_4f())
         
         ### Model head ###
-<<<<<<< Updated upstream
-        self.head1 = nn.Sequential(nn.Linear(32, 32),
-                                   nn.BatchNorm1d(832),
-=======
         self.head1 = nn.Sequential(nn.Conv1d(832, 832, kernel_size=1, padding=0), # temporal linear layer
                                    nn.BatchNorm1d(num_features=832),
->>>>>>> Stashed changes
                                    nn.ReLU())
         self.head2 = nn.Sequential(nn.Conv1d(832, 512, kernel_size=3, stride=1, padding=1))
 
