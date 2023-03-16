@@ -8,7 +8,7 @@ from model import S3D, SepConv3d, BasicConv3d, Mixed_3b, Mixed_3c, Mixed_4b, Mix
 
 class VisualEncoder(nn.Module):
     def __init__(self, n_classes:int):
-        super().__init__()
+        super(VisualEncoder, self).__init__()
 
         self.base = nn.Sequential(
             SepConv3d(3, 64, kernel_size=7, stride=2, padding=3),
@@ -26,24 +26,29 @@ class VisualEncoder(nn.Module):
             Mixed_4f())
         
         ### Model head ###
+<<<<<<< Updated upstream
         self.head1 = nn.Sequential(nn.Linear(32, 32),
                                    nn.BatchNorm1d(832),
+=======
+        self.head1 = nn.Sequential(nn.Conv1d(832, 832, kernel_size=1, padding=0), # temporal linear layer
+                                   nn.BatchNorm1d(num_features=832),
+>>>>>>> Stashed changes
                                    nn.ReLU())
         self.head2 = nn.Sequential(nn.Conv1d(832, 512, kernel_size=3, stride=1, padding=1))
 
         ### Linear translation layer ###
-        self.translation_layer = nn.Sequential(nn.Linear(512, n_classes), 
+        self.translation_layer = nn.Sequential(nn.Conv1d(512, n_classes, kernel_size=1, padding=0), # projection block
                                                nn.ReLU(),
-                                               nn.Softmax(dim=-1))
+                                               nn.Softmax(dim=1))
         
 
     def forward(self, x):
         y = self.base(x)
         y = F.avg_pool3d(y, (1, y.size(3), y.size(4)), stride=1) # TODO Evaluate if this is equivalent to "spatial pooling".
         y = y.view(-1, y.size(1), y.size(2)) # collapse singleton dimensions
-        y = self.head1(y)
+        #y = self.head1(y)
         y = self.head2(y)
-        y = self.translation_layer(y.view(-1, y.size(2), y.size(1))) # reshape for linear layer
+        y = self.translation_layer(y)
         return y
 
 """
@@ -68,7 +73,7 @@ df = pd.read_csv(dp.wlasl_labels)
 img_folder = dp.wlasl_videos
 
 # get datasets
-WLASLtrain = WLASLDataset(df.loc[df['split']=='train'], img_folder, seq_len=64, train=True, grayscale=False)
+WLASLtrain = WLASLDataset(df.loc[df['split']=='train'], img_folder, seq_len=128, train=True, grayscale=False)
 
 dataloaderTrain = data.DataLoader(WLASLtrain, batch_size=1, 
                                    shuffle=True,
@@ -80,9 +85,9 @@ with torch.no_grad():
         #trg = trg.cuda()
         out = model(ipt)
         print(f"Out size: {out.size()}")
-
+        if i == 1:
+           break
 """
-
 
    
 """

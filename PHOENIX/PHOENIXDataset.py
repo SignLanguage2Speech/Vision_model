@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import subprocess
 from PIL import Image
-
+import pdb
 
 def transform_rgb(video):
   ''' stack & normalization '''
@@ -36,7 +36,7 @@ class DataAugmentations:
   def UpsamplePixels(self, imgs: np.ndarray):
     Upsample = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
     imgs = Upsample(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
-    return imgs.permute(0, 2, 3, 1) # return and revert dim changes
+    return imgs.permute(0, 2, 3, 1).numpy() # return and revert dim changes
 
   # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
@@ -108,6 +108,7 @@ class PhoenixDataset(data.Dataset):
         self.vocab_size = vocab_size
         self.video_folders = list(self.df['name'])
         self.DataAugmentation = DataAugmentations()
+        self.MAX_TRG_LEN = 30
 
     def __getitem__(self, idx):
 
@@ -120,6 +121,7 @@ class PhoenixDataset(data.Dataset):
           images = self.DataAugmentation.UpsamplePixels(images)
           images = transform_rgb(images) # convert to tensor, reshape and normalize
           images = self.DataAugmentation.HorizontalFlip(images)
+          
           images = self.DataAugmentation.RandomCrop(images)
           images = self.DataAugmentation.RandomRotation(images)
 
@@ -139,15 +141,12 @@ class PhoenixDataset(data.Dataset):
 
         # make a one-hot vector for target class
         trg_labels = self.df.iloc[idx]['gloss_labels']
+        trg_length = len(trg_labels)
+        pad = torch.nn.ConstantPad1d((0, self.MAX_TRG_LEN - trg_length), value=-1)
+        trg = pad(torch.tensor(trg_labels, dtype=torch.int32))
 
-
-        trg = torch.zeros((len(trg_labels), self.vocab_size)) # 2000 unique words
-        for i, item in enumerate(trg_labels):
-           trg[i, item] = 1
-
-        return images, trg
+        return images, trg, trg_length
 
     
     def __len__(self):
         return len(self.df)
-    

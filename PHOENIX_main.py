@@ -2,18 +2,21 @@ import os
 import numpy as np
 import pandas as pd
 import time
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+from torchaudio.models.decoder import ctc_decoder
+from torchmetrics.functional import word_error_rate
+
 from PHOENIX.PHOENIXDataset import PhoenixDataset
 from PHOENIX.s3d_backbone import VisualEncoder
-
-
-
-#annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
-#features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
+from PHOENIX.preprocess_PHOENIX import getVocab
 
 class DataPaths:
   def __init__(self):
@@ -24,47 +27,46 @@ class cfg:
   def __init__(self):
     self.start_epoch = 0
     self.n_epochs = 80
-    self.save_path = os.path.join('/work3/s204138/bach-models', 'continued_WLASL_training')
+    self.save_path = os.path.join('/work3/s204138/bach-models', 'PHOENIX_trained_models')
     self.load_path = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc') # ! Fill empty string with model file name
     self.checkpoint = "See load path" # start from scratch, i.e. epoch 0
     self.VOCAB_SIZE = 1085
+    self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')
     # self.checkpoint = True # start from checkpoint set in self.load_path
     self.batch_size = 8 # per GPU (they have 56 haha)
     self.lr = 1e-3
-    self.momentum = 0.9
-    self.weight_decay = 5e-4
-    self.num_workers = 4 # ! Set to 0 for debugging
-    self.print_freq = 100
+    self.weight_decay = 1e-3
+    self.num_workers = 8 # ! Set to 0 for debugging
+    self.print_freq = 200
     self.multipleGPUs = False
     # for data augmentation
     self.crop_size = 224
     self.seq_len = 128
-    #self.epsilon = 1e-2 # TODO evaluate value 
-    self.continue_lr = 0.005
 
 
 def main():
     dp = DataPaths()
     CFG = cfg()
+    torch.backends.cudnn.deterministic = True
+    #device = 'cpu'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    train = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
-    val = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
-    test = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
+    train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
+    val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
+    test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
 
-   
-    PhoenixTrain = PhoenixDataset(train, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, seq_len=CFG.seq_len, train=True)
-    PhoenixVal = PhoenixDataset(val, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, seq_len=CFG.seq_len, train=False)
-    PhoenixTest = PhoenixDataset(test, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, seq_len=CFG.seq_len, train=False)
+    PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, seq_len=CFG.seq_len, split='train')
+    PhoenixVal = PhoenixDataset(val_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, seq_len=CFG.seq_len, split='dev')
+    PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, seq_len=CFG.seq_len, split='test')
 
     model = VisualEncoder(CFG.VOCAB_SIZE + 1)
     optimizer = optim.Adam(model.parameters(),
-                           lr = CFG.lr)
+                           lr = CFG.lr,
+                           weight_decay = CFG.weight_decay)
     
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CFG.n_epochs)
 
-
-    criterion = torch.nn.CTCLoss(blank=CFG.VOCAB_SIZE)
+    criterion = torch.nn.CTCLoss(blank=0, zero_infinity=False).to(device) # zero_infinity is for debugging purposes only...
 
 
     dataloaderTrain = DataLoader(PhoenixTrain, batch_size=CFG.batch_size, 
@@ -82,12 +84,27 @@ def main():
     model.to(device)  
     train_losses, train_accs = [], []
 
+    CTC_decoder = ctc_decoder(
+    lexicon=None,       # not using language model
+    lm_dict=None,       # not using language model
+    lm=None,            # not using language model
+    tokens= ['-'] + [str(i+1) for i in range(CFG.VOCAB_SIZE)] + ['|'],
+    nbest=1, # number of hypotheses to return
+    beam_size=10,       # n.o competing hypotheses at each step
+    beam_size_token=20,  # top_n tokens to consider at each step
+    )
+
+    train_losses = []
+    train_WERS = []
+    val_losses = []
+    val_WERS = []
 
     for i in range(CFG.start_epoch, CFG.n_epochs):
       print(f"Current epoch: {i+1}")
       # run train loop
-      train_loss, train_acc = train(model, dataloaderTrain, optimizer, criterion, CFG)
+      train_loss, train_WER = train(model, dataloaderTrain, optimizer, criterion, scheduler, CTC_decoder, CFG)
       train_losses.append(train_loss)
+<<<<<<< Updated upstream
       train_accs.append(train_acc)
 
 def train(model, dataloader, optimizer, criterion, CFG):
@@ -103,11 +120,48 @@ def train(model, dataloader, optimizer, criterion, CFG):
 
     out = model(ipt)
     loss = criterion(out, trg)
+=======
+      train_WERS.append(train_WER)
+
+      # run validation loop
+      val_loss, val_WER = validate(model, dataloaderVal, criterion, CTC_decoder, CFG)
+      val_losses.append(val_loss)
+      val_WERS.append(val_WER)
+
+      ### Save checkpoint ###
+      #fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_acc')
+      #save_checkpoint(fname, model, optimizer, i+1, train_losses, val_losses, train_WERS, val_WERS)
+
+def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
+  losses = []
+  model.train()
+  start = time.time()
+  WERS = []
+  print("################## Starting training ##################")
+  for i, (ipt, trg, trg_len) in enumerate(dataloader):
+
+    ipt = ipt.cuda()
+    #trg = trg.cuda()
+    ipt_len = torch.full(size=(CFG.batch_size,), fill_value=CFG.seq_len/4, dtype=torch.long)
+    
+    refs = [t[:trg_len[i]].cpu() for i, t in enumerate(trg)]
+    ref_sents = [TokensToSent(CFG.gloss_vocab, s) for s in refs]
+
+    out = torch.log(model(ipt))
+    trg = torch.concat([q[:trg_len[i]] for i,q in enumerate(trg)]).cpu()
+
+    loss = criterion(out.view(out.size(2), out.size(0), out.size(1)), 
+                     trg, 
+                     input_lengths=ipt_len,
+                     target_lengths=trg_len.long().cpu())
+    
+>>>>>>> Stashed changes
     losses.append(loss.detach().cpu())
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+<<<<<<< Updated upstream
     
     # compute model accuracy
     _, preds = out.topk(1, 1, True, True)
@@ -123,6 +177,78 @@ def train(model, dataloader, optimizer, criterion, CFG):
   print(f"Final training accuracy: {acc}")
   return losses
 
+=======
+    scheduler.step()
+
+    out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
+    preds = [p[0].tokens for p in out_d]
+    pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
+    WERS.append(word_error_rate(pred_sents, ref_sents).item())
+
+    end = time.time()
+    if i % (CFG.print_freq) == 0:
+      print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
+  
+  print(f"FINAL AVG WER: {np.mean(WERS)}")
+  return losses, WERS
+
+def validate(model, dataloader, criterion, decoder, CFG):
+  losses = []
+  model.eval()
+  start = time.time()
+  WERS = []
+  print("################## Starting validation ##################")
+  for i, (ipt, trg, trg_len) in enumerate(dataloader):
+    with torch.no_grad():
+
+      ipt = ipt.cuda()
+      #trg = trg.cuda()
+
+      out = torch.log(model(ipt))
+      ipt_len = torch.full(size=(1,), fill_value=out.size(2), dtype=torch.long)
+      trg = trg[0][:trg_len[0]]
+      loss = criterion(out.view(out.size(2), out.size(0), out.size(1)), 
+                      trg, 
+                      input_lengths=ipt_len,
+                      target_lengths=trg_len.long().cpu())
+
+      
+      out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
+      preds = [p[0].tokens if len(p[0].tokens) > 0 else 1086 for p in out_d]
+      pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
+      ref_sents = TokensToSent(CFG.gloss_vocab, trg)
+      WERS.append(word_error_rate(pred_sents, ref_sents).item())
+
+      end = time.time()
+      if i % (CFG.print_freq/2) == 0:
+        print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
+
+  print(f"FINAL AVG WER: {np.mean(WERS)}")
+  return losses, WERS
+
+
+def save_checkpoint(path, model, optimizer, epoch, train_losses, val_losses, train_WERS, val_WERS):
+  # save a general checkpoint
+  torch.save({'epoch' : epoch,
+              'model_state_dict' : model.state_dict(),
+              'optimizer_state_dict' : optimizer.state_dict(),
+              'train_losses' : train_losses,
+              'val_losses' : val_losses,
+              'train_WERS' : train_WERS,
+              'val_WERS' : val_WERS
+              }, path)
+
+def TokensToSent(vocab, tokens):
+  
+  keys = list(vocab.keys())
+  values = list(vocab.values())
+  positions = [values.index(e) for e in tokens[tokens != 1086]]
+  words = [keys[p] for p in positions]
+  return ' '.join(words)
+
+if __name__ == '__main__':
+  main()
+>>>>>>> Stashed changes
 
 
 
