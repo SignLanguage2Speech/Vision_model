@@ -141,9 +141,15 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
     scheduler.step()
 
     out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
-    preds = [p[0].tokens for p in out_d]
-    pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
-    WERS.append(word_error_rate(pred_sents, ref_sents).item())
+    try:
+      preds = [p[0].tokens for p in out_d]
+      pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
+      WERS.append(word_error_rate(pred_sents, ref_sents).item())
+    
+    except IndexError:
+      print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
+		
+		
 
     end = time.time()
     if i % (CFG.print_freq) == 0:
@@ -166,6 +172,7 @@ def validate(model, dataloader, criterion, decoder, CFG):
       ipt = ipt.cuda()
       #trg = trg.cuda()
       
+      
       out = torch.log(model(ipt)+1e-16) # add small constant to avoid nan
       print("Out mean: ", torch.mean(out))
       ipt_len = torch.full(size=(1,), fill_value=out.size(2), dtype=torch.long)
@@ -178,10 +185,22 @@ def validate(model, dataloader, criterion, decoder, CFG):
       losses.append(loss.detach().cpu().item())
       
       out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
-      preds = [p[0].tokens if len(p[0].tokens) > 0 else 1086 for p in out_d]
-      pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
-      ref_sents = TokensToSent(CFG.gloss_vocab, trg)
-      WERS.append(word_error_rate(pred_sents, ref_sents).item())
+      #preds = [p[0].tokens if len(p[0].tokens) > 0 else 1086 for p in out_d]
+      #pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
+      #ref_sents = TokensToSent(CFG.gloss_vocab, trg)
+      #WERS.append(word_error_rate(pred_sents, ref_sents).item())
+      
+      try:
+        preds = [p[0].tokens for p in out_d]
+        pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
+        ref_sents = TokensToSent(CFG.gloss_vocab, trg)
+        WERS.append(word_error_rate(pred_sents, ref_sents).item())
+    
+      except IndexError:
+        print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
+
+		
+		
 
       end = time.time()
       if i % (CFG.print_freq/2) == 0:
