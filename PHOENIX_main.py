@@ -15,6 +15,8 @@ from PHOENIX.PHOENIXDataset import PhoenixDataset
 from PHOENIX.s3d_backbone import VisualEncoder
 from PHOENIX.preprocess_PHOENIX import getVocab
 
+import pdb
+
 class DataPaths:
   def __init__(self):
     self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
@@ -34,7 +36,7 @@ class cfg:
     self.lr = 1e-3
     self.weight_decay = 1e-3
     self.num_workers = 8 # ! Set to 0 for debugging
-    self.print_freq = 200
+    self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
     self.crop_size = 224
@@ -61,7 +63,9 @@ def main():
                            lr = CFG.lr,
                            weight_decay = CFG.weight_decay)
     
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CFG.n_epochs)
+    #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(len(train_df)/CFG.batch_size)*4)
+    #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(100/CFG.batch_size)*2)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_df)/CFG.batch_size)*4)
 
     criterion = torch.nn.CTCLoss(blank=0, zero_infinity=False).to(device) # zero_infinity is for debugging purposes only...
 
@@ -85,8 +89,8 @@ def main():
     lm=None,            # not using language model
     tokens= ['-'] + [str(i+1) for i in range(CFG.VOCAB_SIZE)] + ['|'], # vocab + blank and split
     nbest=1, # number of hypotheses to return
-    beam_size=10,       # n.o competing hypotheses at each step
-    beam_size_token=20,  # top_n tokens to consider at each step
+    beam_size = 100,       # n.o competing hypotheses at each step
+    beam_size_token=25,  # top_n tokens to consider at each step
     )
 
     train_losses = []
@@ -107,8 +111,8 @@ def main():
       val_WERS.append(val_WER)
 
       ### Save checkpoint ###
-      fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_acc')
-      save_checkpoint(fname, model, optimizer, i+1, train_losses, val_losses, train_WERS, val_WERS)
+      fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_WER')
+      save_checkpoint(fname, model, optimizer, scheduler, i+1, train_losses, val_losses, train_WERS, val_WERS)
 
 def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
   losses = []
@@ -119,45 +123,57 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
   for i, (ipt, trg, trg_len) in enumerate(dataloader):
 
     ipt = ipt.cuda()
-    #trg = trg.cuda()
-    ipt_len = torch.full(size=(CFG.batch_size,), fill_value=CFG.seq_len/4, dtype=torch.long)
+    trg = trg.cuda()
+    ipt_len = torch.full(size=(CFG.batch_size,), fill_value=CFG.seq_len/4, dtype=torch.int32)
     
     refs = [t[:trg_len[i]].cpu() for i, t in enumerate(trg)]
     ref_sents = [TokensToSent(CFG.gloss_vocab, s) for s in refs]
 
-    out = torch.log(model(ipt))
-    trg = torch.concat([q[:trg_len[i]] for i,q in enumerate(trg)]).cpu()
+    out=model(ipt)
+    #out.view(out.size(2), out.size(0), out.size(1)) #### For convolution w. kernel size 1.
+    x = out.view(out.size(1), out.size(0), out.size(2))
+    trg = torch.concat([q[:trg_len[i]] for i,q in enumerate(trg)])
+    trg_len = trg_len.to(torch.int32)
 
-    loss = criterion(out.view(out.size(2), out.size(0), out.size(1)), 
-                     trg, 
-                     input_lengths=ipt_len,
-                     target_lengths=trg_len.long().cpu())
-    
+    with torch.backends.cudnn.flags(enabled=False):
+      loss = criterion(x, 
+                      trg,#.cpu(), 
+                      input_lengths=ipt_len.cuda(),
+                      target_lengths=trg_len.cuda())
+      
     losses.append(loss.detach().cpu().item())
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    #print("LATEST LRR", scheduler.get_last_lr())
     scheduler.step()
+    
+    #out_d = decoder(torch.exp(out - 1e-16).cpu().view(out.size(0), out.size(2), out.size(1))) ### Used for 1d convolutions w kernel size 1
+    out_d = decoder(torch.exp(out).cpu())
 
-    out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
     try:
       preds = [p[0].tokens for p in out_d]
+      #print("PREDSSS", preds)
       pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
       WERS.append(word_error_rate(pred_sents, ref_sents).item())
     
     except IndexError:
+      #pdb.set_trace()
       print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
 		
-		
-
     end = time.time()
     if i % (CFG.print_freq) == 0:
       print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
+      print("PREDICTIONS:\n", preds)
+      #print("###Reference:\n", ref_sents)
     
-    
-  
-  #print(f"FINAL AVG WER: {np.mean(WERS)}")
+    #if max(1, i) % 10 == 0:
+      #print("###Prediction:\n", pred_sents)
+      #print("###Reference:\n", ref_sents)
+    #  break
+
+  print(f"FINAL AVG WER: {np.mean(WERS)}")
   return losses, WERS
 
 def validate(model, dataloader, criterion, decoder, CFG):
@@ -170,51 +186,51 @@ def validate(model, dataloader, criterion, decoder, CFG):
     with torch.no_grad():
       #print("ipt", ipt.size())
       ipt = ipt.cuda()
-      #trg = trg.cuda()
+      trg = trg.cuda()
       
-      
-      out = torch.log(model(ipt)+1e-16) # add small constant to avoid nan
-      print("Out mean: ", torch.mean(out))
-      ipt_len = torch.full(size=(1,), fill_value=out.size(2), dtype=torch.long)
-      trg = trg[0][:trg_len[0]]
-      loss = criterion(out.view(out.size(2), out.size(0), out.size(1)), 
-                      trg, 
-                      input_lengths=ipt_len,
-                      target_lengths=trg_len.long().cpu())
+      out = model(ipt) # add small constant to avoid nan
+      #out = out.view(out.size(2), out.size(0), out.size(1)) #### For convolution w. kernel size 1.
+      #out = out.view(out.size(1), out.size(0), out.size(2)) #### For nn.Linear layers w. views
+      x = out.view(out.size(1), out.size(0), out.size(2))
+      ipt_len = torch.full(size=(1,), fill_value=x.size(0), dtype=torch.int32)
+      #trg = trg[0]#[:trg_len[0]]
+      trg_len = trg_len.to(torch.int32)
+      with torch.backends.cudnn.flags(enabled=False):
+        loss = criterion(x, 
+                        trg, 
+                        input_lengths=ipt_len,
+                        target_lengths=trg_len)
 
       losses.append(loss.detach().cpu().item())
       
-      out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1)))
-      #preds = [p[0].tokens if len(p[0].tokens) > 0 else 1086 for p in out_d]
-      #pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
-      #ref_sents = TokensToSent(CFG.gloss_vocab, trg)
-      #WERS.append(word_error_rate(pred_sents, ref_sents).item())
+      #out_d = decoder(torch.exp(out).cpu().view(out.size(0), out.size(2), out.size(1))) # for 1d convolutions
+      out_d = decoder(torch.exp(out).cpu())
       
       try:
         preds = [p[0].tokens for p in out_d]
         pred_sents = [TokensToSent(CFG.gloss_vocab, s) for s in preds]
-        ref_sents = TokensToSent(CFG.gloss_vocab, trg)
+        ref_sents = TokensToSent(CFG.gloss_vocab, trg[0][:trg_len[0]])
         WERS.append(word_error_rate(pred_sents, ref_sents).item())
     
       except IndexError:
         print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
-
-		
-		
+        #pdb.set_trace()
 
       end = time.time()
       if i % (CFG.print_freq/2) == 0:
         print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
+        print("PREDICTIONS:\n", preds)
      
   print(f"FINAL AVG WER: {np.mean(WERS)}")
   return losses, WERS
 
 
-def save_checkpoint(path, model, optimizer, epoch, train_losses, val_losses, train_WERS, val_WERS):
+def save_checkpoint(path, model, optimizer, scheduler, epoch, train_losses, val_losses, train_WERS, val_WERS):
   # save a general checkpoint
   torch.save({'epoch' : epoch,
               'model_state_dict' : model.state_dict(),
               'optimizer_state_dict' : optimizer.state_dict(),
+              'scheduler_state_dict' : scheduler.state_dict(),
               'train_losses' : train_losses,
               'val_losses' : val_losses,
               'train_WERS' : train_WERS,
@@ -231,7 +247,3 @@ def TokensToSent(vocab, tokens):
 
 if __name__ == '__main__':
   main()
-
-
-
-
