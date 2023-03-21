@@ -33,11 +33,11 @@ class cfg:
     self.VOCAB_SIZE = 1085
     self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')
     # self.checkpoint = True # start from checkpoint set in self.load_path
-    self.batch_size = 4 # per GPU (they have 56 haha)
+    self.batch_size = 8 # per GPU (they have 56 haha)
     self.lr = 1e-3
     self.weight_decay = 1e-3
-    self.num_workers = 4 # ! Set to 0 for debugging
-    self.print_freq = 10
+    self.num_workers = 8 # ! Set to 0 for debugging
+    self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
     self.crop_size = 224
@@ -65,11 +65,11 @@ def main():
     optimizer = optim.Adam(model.parameters(),
                           lr = CFG.lr,
                           weight_decay = CFG.weight_decay)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_df)/CFG.batch_size)*4)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=int(len(train_df)/CFG.batch_size)*5)
 
     if CFG.checkpoint_path is not None:
       print("################## Loading checkpointed weights ##################")
-      model, optimizer, scheduler, epoch, train_losses, train_WERS, val_losses, val_WERS = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
+      model, optimizer, scheduler, epoch, train_losses, val_losses, train_WERS, val_WERS = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
     
     else:
       print("################## Loading WLASL weights ##################")
@@ -109,7 +109,6 @@ def main():
     beam_size_token=25,  # top_n tokens to consider at each step
     )
 
-
     for i in range(CFG.start_epoch, CFG.n_epochs):
       print(f"Current epoch: {i+1}")
       # run train loop
@@ -118,20 +117,19 @@ def main():
       train_WERS.append(train_WER)
 
       # run validation loop
-      #val_loss, val_WER = validate(model, dataloaderVal, criterion, CTC_decoder, CFG)
-      #val_losses.append(val_loss)
-      #val_WERS.append(val_WER)
+      val_loss, val_WER = validate(model, dataloaderVal, criterion, CTC_decoder, CFG)
+      val_losses.append(val_loss)
+      val_WERS.append(val_WER)
 
       ### Save checkpoint ###
-      #fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_WER')
-      #save_checkpoint(fname, model, optimizer, scheduler, i+1, train_losses, val_losses, train_WERS, val_WERS)
+      fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_WER')
+      save_checkpoint(fname, model, optimizer, scheduler, i+1, train_losses, val_losses, train_WERS, val_WERS)
 
 def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
   losses = []
   model.train()
   start = time.time()
   WERS = []
-  torch.autograd.set_detect_anomaly(True) # for debugging
 
   print("################## Starting training ##################")
   for i, (ipt, trg, trg_len) in enumerate(dataloader):
@@ -144,7 +142,6 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
     ref_sents = [TokensToSent(CFG.gloss_vocab, s) for s in refs]
 
     out=model(ipt)
-    #out.view(out.size(2), out.size(0), out.size(1)) #### For convolution w. kernel size 1.
     #x = out.view(out.size(1), out.size(0), out.size(2))
     x = out.permute(1, 0, 2)
     trg = torch.concat([q[:trg_len[i]] for i,q in enumerate(trg)])
@@ -162,11 +159,9 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
     loss.backward()
     optimizer.step()
     #print("LATEST LRR", scheduler.get_last_lr())
-    #scheduler.step()
-    
-    #out_d = decoder(torch.exp(out - 1e-16).cpu().view(out.size(0), out.size(2), out.size(1))) ### Used for 1d convolutions w kernel size 1
-    out_d = decoder(torch.exp(out).cpu())
+    scheduler.step()
 
+    out_d = decoder(torch.exp(out).cpu())
     try:
       preds = [p[0].tokens for p in out_d]
       #print("PREDSSS", preds)
@@ -183,10 +178,10 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
       print("PREDICTIONS:\n", preds)
       #print("###Reference:\n", ref_sents)
     
-    if max(1, i) % 40 == 0:
+    #if max(1, i) % 5 == 0:
       #print("###Prediction:\n", pred_sents)
       #print("###Reference:\n", ref_sents)
-      break
+      #break
 
   print(f"Final avg. WER train: {np.mean(WERS)}")
   return losses, WERS
@@ -199,14 +194,12 @@ def validate(model, dataloader, criterion, decoder, CFG):
   print("################## Starting validation ##################")
   for i, (ipt, trg, trg_len) in enumerate(dataloader):
     with torch.no_grad():
-      #print("ipt", ipt.size())
+
       ipt = ipt.cuda()
       trg = trg.cuda()
       
       out = model(ipt)
-      #out = out.view(out.size(2), out.size(0), out.size(1)) #### For convolution w. kernel size 1.
-      #out = out.view(out.size(1), out.size(0), out.size(2)) #### For nn.Linear layers w. views
-      x = out.view(out.size(1), out.size(0), out.size(2))
+      x = out.permute(1, 0, 2)
       ipt_len = torch.full(size=(1,), fill_value=x.size(0), dtype=torch.int32)
       #trg = trg[0]#[:trg_len[0]]
       trg_len = trg_len.to(torch.int32)
@@ -235,6 +228,11 @@ def validate(model, dataloader, criterion, decoder, CFG):
       if i % (CFG.print_freq/2) == 0:
         print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
         print("PREDICTIONS:\n", preds)
+      
+      #if max(1, i) % 5 == 0:
+        #print("###Prediction:\n", pred_sents)
+        #print("###Reference:\n", ref_sents)
+        #break
      
   print(f"Final avg. WER val: {np.mean(WERS)}")
   return losses, WERS
