@@ -86,7 +86,7 @@ def main():
     criterion = torch.nn.CTCLoss(blank=0, zero_infinity=False, reduction='mean').to(device) # zero_infinity is for debugging purposes only...
 
     dataloaderTrain = DataLoader(PhoenixTrain, batch_size=CFG.batch_size, 
-                                   shuffle=False,
+                                   shuffle=True,
                                    num_workers=CFG.num_workers)
     dataloaderVal = DataLoader(PhoenixVal, batch_size=1, 
                                    shuffle=False,
