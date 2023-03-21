@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from torchaudio.models.decoder import ctc_decoder
 from torchmetrics.functional import word_error_rate
 
-from utils.load_weigths import load_model_weights
+from utils.load_weigths import load_PHOENIX_weights
 from PHOENIX.PHOENIXDataset import PhoenixDataset
 from PHOENIX.s3d_backbone import VisualEncoder
 from PHOENIX.preprocess_PHOENIX import getVocab
@@ -45,6 +45,7 @@ class cfg:
 
 
 def main():
+    print("################## Running main ##################")
     dp = DataPaths()
     CFG = cfg()
     torch.backends.cudnn.deterministic = True
@@ -68,16 +69,19 @@ def main():
 
     if CFG.checkpoint_path is not None:
       print("################## Loading checkpointed weights ##################")
-      model, optimizer, scheduler, epoch, train_losses, train_WERS, test_losses, test_WERS = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
+      model, optimizer, scheduler, epoch, train_losses, train_WERS, val_losses, val_WERS = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
     
     else:
       print("################## Loading WLASL weights ##################")
-      WLASL_weights = torch.load(CFG.default_checkpoint)['model_state_dict']
-      model = load_model_weights(model, CFG.default_checkpoint, verbose=True)
+      load_PHOENIX_weights(model, CFG.default_checkpoint, verbose=True)
       # initialize optimizer again with updated params
       optimizer = optim.Adam(model.parameters(),
                           lr = CFG.lr,
                           weight_decay = CFG.weight_decay)
+      train_losses = []
+      train_WERS = []
+      val_losses = []
+      val_WERS = []
       
     criterion = torch.nn.CTCLoss(blank=0, zero_infinity=False, reduction='mean').to(device) # zero_infinity is for debugging purposes only...
 
@@ -105,10 +109,6 @@ def main():
     beam_size_token=25,  # top_n tokens to consider at each step
     )
 
-    train_losses = []
-    train_WERS = []
-    val_losses = []
-    val_WERS = []
 
     for i in range(CFG.start_epoch, CFG.n_epochs):
       print(f"Current epoch: {i+1}")
@@ -183,10 +183,10 @@ def train(model, dataloader, optimizer, criterion, scheduler, decoder, CFG):
       print("PREDICTIONS:\n", preds)
       #print("###Reference:\n", ref_sents)
     
-    #if max(1, i) % 30 == 0:
+    if max(1, i) % 40 == 0:
       #print("###Prediction:\n", pred_sents)
       #print("###Reference:\n", ref_sents)
-      #break
+      break
 
   print(f"Final avg. WER train: {np.mean(WERS)}")
   return losses, WERS
