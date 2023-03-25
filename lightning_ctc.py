@@ -23,7 +23,7 @@ class cfg:
     def __init__(self):
         self.start_epoch = 0
         self.n_epochs = 80
-        self.init_lr = 1.5e-3
+        self.init_lr = 1e-3
         self.weight_decay = 1e-3
         self.batch_size = 6
         self.seq_len = 128
@@ -70,6 +70,30 @@ class VisualEncoder_lightning(pl.LightningModule):
 
         loss = self.criterion(log_probs=log_probs, targets=y, input_lengths=(input_lengths), target_lengths=(target_lengths))
 
+        CTC_decoder = ctc_decoder(
+            lexicon=None, lm_dict=None, lm=None, # not using language model
+            tokens= ['-'] + [str(i+1) for i in range(self.cfg.VOCAB_SIZE)] + ['|'], # vocab + blank and split
+            nbest=1,            # number of hypotheses to return
+            beam_size=100,       # n.o competing hypotheses at each step
+            beam_size_token=25) # top_n tokens to consider at each step
+        out_decoder = CTC_decoder(torch.exp(out).cpu())
+        WER = -1
+        try:
+            preds = [p[0].tokens for p in out_decoder]
+            pred_sents = [TokensToSent(self.cfg.gloss_vocab, s) for s in preds] # predicted sentences
+            ref_sents = [TokensToSent(self.cfg.gloss_vocab, s) for s in refs]   # reference sentences
+            WER = word_error_rate(pred_sents, ref_sents).item()
+            print()
+            print_ref =  lambda idx: print(f'Actual    [{idx}]:' + str(ref_sents[idx]))
+            print_pred = lambda idx: print(f'Predicted [{idx}]:' + str(pred_sents[idx]))
+            for i in range(len(pred_sents)):
+                print_ref(i)
+                if str(pred_sents[i]) != '':
+                    print_pred(i)
+            print('WER:', WER)
+        except IndexError:
+            print(f"The output of the decoder:\n{out_decoder}\n caused an IndexError!")  
+
         return {'loss': loss}
     
     def validation_step(self, batch, batch_num):
@@ -113,19 +137,22 @@ class VisualEncoder_lightning(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.model.parameters(),
+        # optimizer = optim.Adam(self.model.parameters(),
+        #                 self.cfg.init_lr,
+        #                 weight_decay=self.cfg.weight_decay)
+        optimizer = optim.AdamW(self.model.parameters(),
                         self.cfg.init_lr,
                         weight_decay=self.cfg.weight_decay)
-        # return optimizer
+        return optimizer
         # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5*1183*6*self.cfg.n_epochs)
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4*1183*self.cfg.n_epochs)
-        return {
-            "optimizer": optimizer, 
-            "lr_scheduler": {
-                "scheduler": scheduler, 
-                "monitor": "loss" # could be val loss
-                }
-            }
+        # scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4*1183*self.cfg.n_epochs)
+        # return {
+        #     "optimizer": optimizer, 
+        #     "lr_scheduler": {
+        #         "scheduler": scheduler, 
+        #         "monitor": "loss" # could be val loss
+        #         }
+        #     }
 
     def get_dataloader(self, split_type) -> DataLoader:
         df = pd.read_csv(os.path.join(self.dp.phoenix_labels, f'PHOENIX-2014-T.{split_type}.corpus.csv'), delimiter = '|')
