@@ -94,24 +94,26 @@ def load_imgs(ipt_dir):
 df : Phoenix dataframe (train, dev or test)
 ipt dir : Directory with videos associated to df
 vocab size : number of unique glosses/words in df
-seq_len : length to be upsampled to during training.
 split : 'train', 'dev' or 'test'
 """
 
 class PhoenixDataset(data.Dataset):
-    def __init__(self, df, ipt_dir, vocab_size, seq_len=128, split='train'):
+    def __init__(self, df, ipt_dir, vocab_size, split='train'):
         super().__init__()
-        self.df = preprocess_df(df, save=False, save_name=None)
+
         self.ipt_dir = ipt_dir
-        self.seq_len = seq_len
         self.split=split
         self.vocab_size = vocab_size
+
+        if self.split == 'train':
+          self.df = df
+        else:
+          self.df = preprocess_df(df, split, save=False, save_name=None)
+  
         self.video_folders = list(self.df['name'])
         self.DataAugmentation = DataAugmentations()
-        self.MAX_TRG_LEN = 30
 
     def __getitem__(self, idx):
-
         ### Assumes that within a sample (id column in df) there is only one folder named '1' ###
         # TODO Check that this holds!
         image_folder = os.path.join(self.ipt_dir, self.split, self.video_folders[idx])
@@ -121,32 +123,81 @@ class PhoenixDataset(data.Dataset):
           images = self.DataAugmentation.UpsamplePixels(images)
           images = transform_rgb(images) # convert to tensor, reshape and normalize
           images = self.DataAugmentation.HorizontalFlip(images)
-          
           images = self.DataAugmentation.RandomCrop(images)
           images = self.DataAugmentation.RandomRotation(images)
-
-          # check if we need to upsample
-          if self.seq_len > images.size(1): 
-            images = upsample(images, self.seq_len)
-          # check if we need to downsample
-          elif self.seq_len < images.size(1):
-            images = downsample(images, self.seq_len)
           
         # split == 'dev' or 'test'
         else:
+           # apply validation augmentations
            images = self.DataAugmentation.UpsamplePixels(images)
            images = transform_rgb(images)
            images = self.DataAugmentation.CenterCrop(images)
-           # apply validation augmentations
+
+        ipt_len = images.size(1)
 
         # make a one-hot vector for target class
-        trg_labels = self.df.iloc[idx]['gloss_labels']
+        trg_labels = torch.tensor(self.df.iloc[idx]['gloss_labels'], dtype=torch.int32)
         trg_length = len(trg_labels)
-        pad = torch.nn.ConstantPad1d((0, self.MAX_TRG_LEN - trg_length), value=-1)
-        trg = pad(torch.tensor(trg_labels, dtype=torch.int32))
 
-        return images, trg, trg_length
+        return images, ipt_len, trg_labels, trg_length
 
-    
     def __len__(self):
         return len(self.df)
+
+def collator(data):
+  ipts, ipt_lens, trgs,  trg_lens = list(zip(*data))
+  max_ipt_len = max(ipt_lens)
+  max_trg_len = max(trg_lens)
+
+  batch = torch.zeros((len(ipts), 3, max_ipt_len, 224, 224))
+  targets = torch.zeros((len(trgs), max_trg_len))
+
+  for i, ipt in enumerate(ipts):
+    if ipt.size(1) > max_ipt_len:
+      batch[i] = upsample(ipt)
+    
+    pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
+    targets[i] = pad(trgs[i])
+
+  
+  return batch, torch.tensor(ipt_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
+
+
+
+  
+"""
+from torch.utils.data import DataLoader
+
+class DataPaths:
+  def __init__(self):
+    self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
+    self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
+
+dp = DataPaths()
+test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
+PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
+
+#data = [PhoenixTest.__getitem__(0), (PhoenixTest.__getitem__(1))]
+
+#ipts, ipt_lens, _, _ = list(zip(*data))
+
+#print(ipt_lens)
+#print(ipts[0].size())
+#max_len = max(ipt_lens)
+
+#D = [('1', 'hi', 5), ('2', 'hola', 4)]
+#z = zip(*D)
+#print(list(z))
+
+dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
+                                   shuffle=False,
+                                   num_workers=0,
+                                   collate_fn=collator)
+
+for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
+  print("IPTT", ipt.size())
+  print(ipt_len)
+  print("TRGG", trg.size())
+  print(trg_len)
+
+"""
