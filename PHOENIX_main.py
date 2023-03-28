@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import time
+import random
 
 import torch
 import torch.nn as nn
@@ -27,18 +28,17 @@ class cfg:
   def __init__(self):
     self.start_epoch = 0
     self.n_epochs = 100
-    self.save_path = os.path.join('/work3/s204138/bach-models', 'PHOENIX_trained_Tmax_5e')
-    self.default_checkpoint = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc') # ! Fill empty string with model file name
-    self.checkpoint_path = '/work3/s204138/bach-models/PHOENIX_trained_Tmax_5e/S3D_PHOENIX-80_epochs-103.722864_loss_3.694577_WER' # start from scratch, i.e. epoch 0
+    self.save_path = os.path.join('/work3/s204138/bach-models', 'PHOENIX_trained_models')
+    self.default_checkpoint = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc')
+    self.checkpoint_path = None #'/work3/s204138/bach-models/PHOENIX_trained_models/'  # if None train from scratch
     #self.checkpoint_path = None
     self.VOCAB_SIZE = 1085
     self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')
-    # self.checkpoint = True # start from checkpoint set in self.load_path
-    self.batch_size = 2 # per GPU (they have 56 haha)
+    self.batch_size = None # per GPU (they have 56 haha)
     self.lr = 1e-3
     self.weight_decay = 1e-3
     self.scheduler_reset_freq = 5
-    self.num_workers = 8 # ! Set to 0 for debugging
+    self.num_workers = 8 # ! Set to 0 for debugginge
     self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
@@ -123,8 +123,8 @@ def main():
       val_WERS.append(val_WER)
 
       ### Save checkpoint ###
-      #fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_WER')
-      #save_checkpoint(fname, model, optimizer, scheduler, i+1, train_losses, val_losses, train_WERS, val_WERS)
+      fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{i+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_WER):5f}_WER')
+      save_checkpoint(fname, model, optimizer, scheduler, i+1, train_losses, val_losses, train_WERS, val_WERS)
 
 def train(model, dataloaders, optimizer, criterion, scheduler, decoder, CFG):
   losses = []
@@ -133,10 +133,11 @@ def train(model, dataloaders, optimizer, criterion, scheduler, decoder, CFG):
   WERS = []
 
   print("################## Starting training ##################")
-  for n, dataloader in enumerate(dataloaders):
-    print(f"Training on dataloader: {n}")
+  #random.shuffle(dataloaders) # shuffle dataloaders (inplace)
+  for dataloader in dataloaders:
+    dataloader = dataloaders[-4]
+    print("DATASET LEN: ", len(dataloader.dataset))
     for i, (ipt, _, trg, trg_len) in enumerate(dataloader):
-
       ipt = ipt.cuda()
       trg = trg.cuda()
 
@@ -147,7 +148,8 @@ def train(model, dataloaders, optimizer, criterion, scheduler, decoder, CFG):
       x = out.permute(1, 0, 2)
       trg = torch.concat([q[:trg_len[i]] for i,q in enumerate(trg)])
       trg_len = trg_len.to(torch.int32)
-      ipt_len = torch.full(size=(CFG.batch_size,), fill_value = out.size(1), dtype=torch.int32)
+      ipt_len = torch.full(size=(out.size(0),), fill_value = out.size(1), dtype=torch.int32)
+
       with torch.backends.cudnn.flags(enabled=False):
         loss = criterion(x, 
                         trg,#.cpu(), 
@@ -176,22 +178,19 @@ def train(model, dataloaders, optimizer, criterion, scheduler, decoder, CFG):
       
       end = time.time()
       if max(1, i) % (CFG.print_freq) == 0:
-        print("IPT SIZE", ipt.size())
-        print("IPT LEN", ipt_len)
-        print("TRG SIZE", trg.size())
-        print("TRG LEN", trg_len)
 
         print(f"Iter: {i}/{len(dataloader)}\nAvg loss: {np.mean(losses):.6f}\nAvg WER: {np.mean(WERS):.4f}\nTime: {(end - start)/60:.4f} min")
         print("PREDICTIONS:\n", pred_sents)
         print("###Reference:\n", ref_sents)
       
-      #if max(1, i) % 20 == 0:
+      #if max(1, i) % 2 == 0:
         #print("###Prediction:\n", pred_sents)
         #print("###Reference:\n", ref_sents)
         #break
 
-    print(f"Final avg. WER train: {np.mean(WERS)}")
-    return losses, WERS
+    print(f"Avg. WER after dataset: {np.mean(WERS)}")
+  print(f"Final avg. WER: {np.mean(WERS)}")
+  return losses, WERS
 
 def validate(model, dataloader, criterion, decoder, CFG):
   losses = []
@@ -201,16 +200,18 @@ def validate(model, dataloader, criterion, decoder, CFG):
   print("################## Starting validation ##################")
   for i, (ipt, _, trg, trg_len) in enumerate(dataloader):
     with torch.no_grad():
-      print("IPTT", ipt.size())
-      print("TRG SIZE", trg.size())
-      print("TRG LEN", trg_len)
       ipt = ipt.cuda()
       trg = trg.cuda()
       
       out = model(ipt)
       x = out.permute(1, 0, 2)
-      print("OUTT", out.size())
-      ipt_len = torch.full(size=(1,), fill_value = out.size(0), dtype=torch.int32)
+      ipt_len = torch.full(size=(1,), fill_value = out.size(1), dtype=torch.int32)
+
+      #print("IPTT", ipt.size())
+      #print("IPT LEN ", ipt_len)
+      #print("OUTT", out.size())
+      #print("TRGG", trg.size())
+      #print("TRG LEN", trg_len)
       with torch.backends.cudnn.flags(enabled=False):
         loss = criterion(x, 
                       trg, 
@@ -280,11 +281,15 @@ def TokensToSent(vocab, tokens):
 
 def getTrainLoaders(train_df, collator, dp, CFG):
   dataframes = preprocess_df(train_df, split='train', save=False)
+  print("N datasets in train: ", len(dataframes))
   dataLoaders = []
   
-  for df in dataframes:
-    dataLoaders.append(DataLoader(PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='train'),
-                                  batch_size=CFG.batch_size,
+  # define batch sizes for datasets to avoid OOM
+  batch_sizes = [8, 8, 8, 8, 8, 8, 8,
+                 8, 8, 8, 6, 4, 4, 2]
+  for i, df in enumerate(dataframes):
+    dataLoaders.append(DataLoader(PhoenixDataset(df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='train'),
+                                  batch_size=batch_sizes[i],
                                   shuffle=True, 
                                   num_workers=CFG.num_workers,
                                   collate_fn=collator))
