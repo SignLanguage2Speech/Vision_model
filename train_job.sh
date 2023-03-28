@@ -3,7 +3,7 @@
 ### –- specify queue --
 #BSUB -q gpua100
 ### -- set the job Name --
-#BSUB -J Vision_model_CTCLoss_training
+#BSUB -J CTC_large_bs_singleGPU
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 8
 ### -- Select the resources: gpus in exclusive process mode --
@@ -12,7 +12,7 @@
 #BSUB -W 24:00
 # request 24GB of system-memory
 #BSUB -R "rusage[mem=24GB]"
-#BSUB -R "select[gpu40gb]"
+#BSUB -R "select[gpu80gb]"
 
 ### -- set the email address --
 #BSUB -u s204503@student.dtu.dk
@@ -23,8 +23,8 @@
 #BSUB -N
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o Visual_Backbone_Pretraining-%J.out
-#BSUB -e Visual_Backbone_Pretraining-%J.err
+#BSUB -o CTC_new-%J.out
+#BSUB -e CTC_new-%J.err
 # -- end of LSF options --
 
 nvidia-smi

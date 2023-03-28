@@ -7,6 +7,10 @@ import pandas as pd
 import os
 from torchaudio.models.decoder import ctc_decoder
 from torchmetrics.functional import word_error_rate
+from math import ceil
+
+from torch.utils.data import Sampler, BatchSampler, SubsetRandomSampler
+from random import shuffle
 
 from PHOENIX.PHOENIXDataset import upsample, downsample
 from PHOENIX.PHOENIXDataset import collator
@@ -18,7 +22,7 @@ import pdb
 torch.backends.cudnn.deterministic = True # CTC stuff
 
 from PHOENIX.PHOENIXDataset import PhoenixDataset
-from PHOENIX.preprocess_PHOENIX import getVocab
+from PHOENIX.preprocess_PHOENIX import getVocab, preprocess_df
 from load_wlasl_weights import load_model_weights
 from PHOENIX.s3d_backbone import VisualEncoder
 
@@ -43,6 +47,45 @@ class PhoenixPaths:
         self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
         self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
 
+class DynamicSampler(Sampler):
+    def __init__(self, subset_dfs, batch_sizes, num_replicas=None, rank=None, seed=0, drop_last=False):
+        self.total_samples = None # length of entire dataset
+        self.num_samples = 0          # length of specific sampler's dataset
+        self.batch_samplers = []
+        for i,df in enumerate(subset_dfs):
+            self.num_samples += ceil(len(df) / batch_sizes[i])
+            subset_batch_sampler = BatchSampler(SubsetRandomSampler(list(df['index'])), batch_size=batch_sizes[i], drop_last=drop_last) # ! assumes dataframes retains original index col
+            self.batch_samplers.append(subset_batch_sampler)
+        
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.epoch = 0
+        
+        if num_replicas is None or rank is None: # if not parallel, terminate constructor here
+            return
+
+        self.total_samples = self.num_samples
+        self.num_samples =  ceil(self.num_samples / self.num_replicas)
+
+    def __iter__(self):
+        all_batches = []
+        shuffle(self.batch_samplers)
+        for sampler in self.batch_samplers:
+            for b in sampler:
+                all_batches.append(b)
+        if self.num_replicas is not None: # subsample batches
+            all_batches = all_batches[self.rank:self.total_samples:self.num_replicas]
+        for batch in all_batches:
+            yield batch
+    
+    def __len__(self):
+        return self.num_samples # ? num_samples or total_samples?
+    
+    def set_epoch(self, epoch):
+        print('setting epoch')
+        self.epoch = epoch
+    
+
 class VisualEncoder_lightning(pl.LightningModule):
     def __init__(self, load_model=False):
         super().__init__()
@@ -62,19 +105,15 @@ class VisualEncoder_lightning(pl.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_num):
-        # return 
         x,(y,target_lengths) = batch
         # x, ipt_lengths, y,target_lengths = batch
         out = self.model(x)
-        # log_probs = out.view(out.shape[1],out.shape[0],out.shape[2])
         log_probs = out.permute(1,0,2)
         input_lengths = torch.full(size=(out.shape[0],), fill_value=out.shape[1], dtype=torch.long)
         target_lengths = target_lengths.type(torch.long)#.cpu()
 
         refs = [t[:target_lengths[i]] for i, t in enumerate(y)]
         y = torch.concat(refs) # CuDNN - non-zero padded concatenated format
-
-        # pdb.set_trace()
 
         loss = self.criterion(log_probs=log_probs, targets=y, input_lengths=(input_lengths), target_lengths=(target_lengths))
 
@@ -83,8 +122,6 @@ class VisualEncoder_lightning(pl.LightningModule):
     def validation_step(self, batch, batch_num):
         x,(y,target_lengths) = batch
         # x, ipt_lengths, y, target_lengths = batch
-        # pdb.set_trace()
-        # out = torch.log(self.model(x))
         out = self.model(x)
         log_probs = out.view(out.shape[1],out.shape[0],out.shape[2])
         input_lengths = torch.full(size=(out.shape[0],), fill_value=out.shape[1], dtype=torch.long)
@@ -123,9 +160,6 @@ class VisualEncoder_lightning(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        # optimizer = optim.Adam(self.model.parameters(),
-        #                 self.cfg.init_lr,
-        #                 weight_decay=self.cfg.weight_decay)
         optimizer = optim.AdamW(self.model.parameters(),
                         self.cfg.init_lr,
                         weight_decay=self.cfg.weight_decay)
@@ -159,8 +193,7 @@ class VisualEncoder_lightning(pl.LightningModule):
         img_seq_tensor = torch.zeros(len(batch), 3, max_len, 224, 224)
         trg_tensor = torch.zeros(len(batch),max_trg_len)
         trg_len_tensor = torch.zeros(len(batch))
-        # for i, (img_seq, (trg, trg_len)) in enumerate(batch):
-        i = 0
+        i = 0 # enumerate seems to be slower for some reason
         for (img_seq, (trg, trg_len)) in batch:
             img_seq_tensor[i] = self.up_down_sample_helper(img_seq, max_len)
             pad = torch.nn.ConstantPad1d((0, max_trg_len-len(trg)), value=-1)
@@ -174,14 +207,21 @@ class VisualEncoder_lightning(pl.LightningModule):
         dataset = PhoenixDataset(df, 
                                  self.dp.phoenix_videos, 
                                  self.vocab_size, 
-                                 seq_len=self.cfg.seq_len, 
+                                #  seq_len=self.cfg.seq_len, 
                                  split=split_type)
-        return DataLoader(dataset, 
-                          batch_size=self.cfg.batch_size if split_type=='train' else 1, 
+        if split_type == 'train':
+            return DataLoader(dataset,
                           num_workers=self.cfg.num_workers, 
-                          shuffle=(True if split_type=='train' else False),
+                          shuffle=False,
+                          batch_sampler=DynamicSampler(*getSubsets(df)),#, num_replicas=2, rank=self.global_rank),
+                        #   batch_sampler=DynamicSampler(*getSubsets(df), num_replicas=2, rank=torch._utils._get_device_index()),
                           collate_fn=self.collate_fn)
-                        #   collate_fn=collator)
+        else:
+            return DataLoader(dataset, 
+                          batch_size=1, 
+                          num_workers=self.cfg.num_workers, 
+                          shuffle=False,
+                          collate_fn=self.collate_fn)
     
     def train_dataloader(self) -> DataLoader:
         return self.get_dataloader('train')
@@ -198,3 +238,15 @@ def TokensToSent(vocab, tokens):
   positions = [values.index(e) for e in tokens[tokens != 1086]]
   words = [keys[p] for p in positions]
   return ' '.join(words)
+
+def getSubsets(train_df):
+  dataframes = preprocess_df(train_df, split='train', save=False)
+  
+  # define batch sizes for datasets to avoid OOM on GPU (A100 40GB)
+  batch_sizes = [8, 8, 8, 8, 8, 8, 8,
+                 8, 8, 8, 6, 4, 4, 2]
+  # V100 32GB
+#   batch_sizes = [6, 6, 6, 6, 6, 6, 6, 
+#                  6, 6, 6, 4, 2, 2, 2]
+
+  return dataframes, batch_sizes
