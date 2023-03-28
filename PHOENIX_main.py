@@ -133,9 +133,8 @@ def train(model, dataloaders, optimizer, criterion, scheduler, decoder, CFG):
   WERS = []
 
   print("################## Starting training ##################")
-  #random.shuffle(dataloaders) # shuffle dataloaders (inplace)
+  random.shuffle(dataloaders) # shuffle dataloaders (inplace)
   for dataloader in dataloaders:
-    dataloader = dataloaders[-4]
     print("DATASET LEN: ", len(dataloader.dataset))
     for i, (ipt, _, trg, trg_len) in enumerate(dataloader):
       ipt = ipt.cuda()
