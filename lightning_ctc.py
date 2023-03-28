@@ -8,11 +8,14 @@ import os
 from torchaudio.models.decoder import ctc_decoder
 from torchmetrics.functional import word_error_rate
 
+from PHOENIX.PHOENIXDataset import upsample, downsample
+from PHOENIX.PHOENIXDataset import collator
+
 from typing import Dict, Any
 
 import pdb
 
-torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.deterministic = True # CTC stuff
 
 from PHOENIX.PHOENIXDataset import PhoenixDataset
 from PHOENIX.preprocess_PHOENIX import getVocab
@@ -26,6 +29,7 @@ class cfg:
         self.init_lr = 1e-3
         self.weight_decay = 1e-3
         self.batch_size = 6
+        self.num_workers = 8
         self.seq_len = 128
         self.VOCAB_SIZE = 1085
         # self.momentum = -1000 # TODO look up value
@@ -58,7 +62,9 @@ class VisualEncoder_lightning(pl.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_num):
+        # return 
         x,(y,target_lengths) = batch
+        # x, ipt_lengths, y,target_lengths = batch
         out = self.model(x)
         # log_probs = out.view(out.shape[1],out.shape[0],out.shape[2])
         log_probs = out.permute(1,0,2)
@@ -68,36 +74,16 @@ class VisualEncoder_lightning(pl.LightningModule):
         refs = [t[:target_lengths[i]] for i, t in enumerate(y)]
         y = torch.concat(refs) # CuDNN - non-zero padded concatenated format
 
-        loss = self.criterion(log_probs=log_probs, targets=y, input_lengths=(input_lengths), target_lengths=(target_lengths))
+        # pdb.set_trace()
 
-        CTC_decoder = ctc_decoder(
-            lexicon=None, lm_dict=None, lm=None, # not using language model
-            tokens= ['-'] + [str(i+1) for i in range(self.cfg.VOCAB_SIZE)] + ['|'], # vocab + blank and split
-            nbest=1,            # number of hypotheses to return
-            beam_size=100,       # n.o competing hypotheses at each step
-            beam_size_token=25) # top_n tokens to consider at each step
-        out_decoder = CTC_decoder(torch.exp(out).cpu())
-        WER = -1
-        try:
-            preds = [p[0].tokens for p in out_decoder]
-            pred_sents = [TokensToSent(self.cfg.gloss_vocab, s) for s in preds] # predicted sentences
-            ref_sents = [TokensToSent(self.cfg.gloss_vocab, s) for s in refs]   # reference sentences
-            WER = word_error_rate(pred_sents, ref_sents).item()
-            print()
-            print_ref =  lambda idx: print(f'Actual    [{idx}]:' + str(ref_sents[idx]))
-            print_pred = lambda idx: print(f'Predicted [{idx}]:' + str(pred_sents[idx]))
-            for i in range(len(pred_sents)):
-                print_ref(i)
-                if str(pred_sents[i]) != '':
-                    print_pred(i)
-            print('WER:', WER)
-        except IndexError:
-            print(f"The output of the decoder:\n{out_decoder}\n caused an IndexError!")  
+        loss = self.criterion(log_probs=log_probs, targets=y, input_lengths=(input_lengths), target_lengths=(target_lengths))
 
         return {'loss': loss}
     
     def validation_step(self, batch, batch_num):
         x,(y,target_lengths) = batch
+        # x, ipt_lengths, y, target_lengths = batch
+        # pdb.set_trace()
         # out = torch.log(self.model(x))
         out = self.model(x)
         log_probs = out.view(out.shape[1],out.shape[0],out.shape[2])
@@ -112,9 +98,9 @@ class VisualEncoder_lightning(pl.LightningModule):
         CTC_decoder = ctc_decoder(
             lexicon=None, lm_dict=None, lm=None, # not using language model
             tokens= ['-'] + [str(i+1) for i in range(self.cfg.VOCAB_SIZE)] + ['|'], # vocab + blank and split
-            nbest=1,            # number of hypotheses to return
+            nbest=1,             # number of hypotheses to return
             beam_size=100,       # n.o competing hypotheses at each step
-            beam_size_token=25) # top_n tokens to consider at each step
+            beam_size_token=25)  # top_n tokens to consider at each step
         out_decoder = CTC_decoder(torch.exp(out).cpu())
         WER = -1
         try:
@@ -143,16 +129,45 @@ class VisualEncoder_lightning(pl.LightningModule):
         optimizer = optim.AdamW(self.model.parameters(),
                         self.cfg.init_lr,
                         weight_decay=self.cfg.weight_decay)
-        return optimizer
+        # return optimizer
         # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5*1183*6*self.cfg.n_epochs)
-        # scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=4*1183*self.cfg.n_epochs)
-        # return {
-        #     "optimizer": optimizer, 
-        #     "lr_scheduler": {
-        #         "scheduler": scheduler, 
-        #         "monitor": "loss" # could be val loss
-        #         }
-        #     }
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5*1183*self.cfg.n_epochs)
+        return {
+            "optimizer": optimizer, 
+            "lr_scheduler": {
+                "scheduler": scheduler, 
+                "monitor": "loss" # could be val loss
+                }
+            }
+
+    def up_down_sample_helper(self, image_seq, max_len):
+        img_seq_len = image_seq.size(1)
+        if img_seq_len < max_len : 
+            image_seq = upsample(image_seq, max_len)
+        elif img_seq_len > max_len: # ? somehow 🤔
+            image_seq = downsample(image_seq, max_len)
+        return image_seq
+
+    def collate_fn(self, batch):
+        # print(batch)
+        max_len, max_trg_len = 0, 0
+        for img_seq, (trg, trg_len) in batch:
+            max_len = max(img_seq.size(1), max_len)
+            max_trg_len = max(trg_len, max_trg_len)
+        # max_len = min(max_len,128) # truncate to ensure sufficient GPU memory (for batch size 6 on A100 40GB)
+        # print("Max len of batch", max_len)
+        img_seq_tensor = torch.zeros(len(batch), 3, max_len, 224, 224)
+        trg_tensor = torch.zeros(len(batch),max_trg_len)
+        trg_len_tensor = torch.zeros(len(batch))
+        # for i, (img_seq, (trg, trg_len)) in enumerate(batch):
+        i = 0
+        for (img_seq, (trg, trg_len)) in batch:
+            img_seq_tensor[i] = self.up_down_sample_helper(img_seq, max_len)
+            pad = torch.nn.ConstantPad1d((0, max_trg_len-len(trg)), value=-1)
+            trg_tensor[i] = pad(trg)
+            trg_len_tensor[i] = trg_len
+            i += 1
+        return img_seq_tensor, (trg_tensor, trg_len_tensor)
 
     def get_dataloader(self, split_type) -> DataLoader:
         df = pd.read_csv(os.path.join(self.dp.phoenix_labels, f'PHOENIX-2014-T.{split_type}.corpus.csv'), delimiter = '|')
@@ -162,9 +177,11 @@ class VisualEncoder_lightning(pl.LightningModule):
                                  seq_len=self.cfg.seq_len, 
                                  split=split_type)
         return DataLoader(dataset, 
-                          batch_size=(self.cfg.batch_size if split_type=='train' else 1), 
-                          num_workers=8, 
-                          shuffle=(True if split_type=='train' else False))
+                          batch_size=self.cfg.batch_size if split_type=='train' else 1, 
+                          num_workers=self.cfg.num_workers, 
+                          shuffle=(True if split_type=='train' else False),
+                          collate_fn=self.collate_fn)
+                        #   collate_fn=collator)
     
     def train_dataloader(self) -> DataLoader:
         return self.get_dataloader('train')

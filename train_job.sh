@@ -12,7 +12,7 @@
 #BSUB -W 24:00
 # request 24GB of system-memory
 #BSUB -R "rusage[mem=24GB]"
-#BSUB -R "select[gpu80gb]"
+#BSUB -R "select[gpu40gb]"
 
 ### -- set the email address --
 #BSUB -u s204503@student.dtu.dk

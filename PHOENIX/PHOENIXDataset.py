@@ -99,6 +99,26 @@ seq_len : length to be upsampled to during training.
 split : 'train', 'dev' or 'test'
 """
 
+def collator(data):
+  ipts, ipt_lens, trgs,  trg_lens = list(zip(*data))
+  max_ipt_len = max(ipt_lens)
+  max_trg_len = max(trg_lens)
+
+  batch = torch.zeros((len(ipts), 3, max_ipt_len, 224, 224))
+  targets = torch.zeros((len(ipts), max_trg_len))
+
+  for i, ipt in enumerate(ipts):
+    if ipt.size(1) > max_ipt_len:
+      batch[i] = upsample(ipt)
+
+    if max_trg_len > len(trgs[i]):
+      pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
+      targets[i] = pad(torch.tensor(trgs[i], dtype=torch.int32))
+
+
+  return batch, torch.tensor(ipt_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
+
+
 class PhoenixDataset(data.Dataset):
     def __init__(self, df, ipt_dir, vocab_size, seq_len=128, split='train'):
         super().__init__()
@@ -126,11 +146,11 @@ class PhoenixDataset(data.Dataset):
           images = self.DataAugmentation.RandomRotation(images)
 
           # check if we need to upsample
-          if self.seq_len > images.size(1): 
-            images = upsample(images, self.seq_len)
-          # check if we need to downsample
-          elif self.seq_len < images.size(1):
-            images = downsample(images, self.seq_len)
+          # if self.seq_len > images.size(1): 
+          #   images = upsample(images, self.seq_len)
+          # # check if we need to downsample
+          # elif self.seq_len < images.size(1):
+          #   images = downsample(images, self.seq_len)
           
         # split == 'dev' or 'test'
         else:
@@ -141,18 +161,11 @@ class PhoenixDataset(data.Dataset):
 
         trg_labels = self.df.iloc[idx]['gloss_labels']
         trg_length = len(trg_labels)
-        pad = torch.nn.ConstantPad1d((0,self.MAX_TARGET_SEQUENCE_LEN - trg_length), value=0) # ! blank index as padding
-        trg = pad(torch.tensor(trg_labels, dtype=torch.long))
-        
-        # # make a one-hot vector for target class
-        # trg_labels = self.df.iloc[idx]['gloss_labels']
+        # pad = torch.nn.ConstantPad1d((0,self.MAX_TARGET_SEQUENCE_LEN - trg_length), value=0) # ! blank index as padding
+        # trg = pad(torch.tensor(trg_labels, dtype=torch.long))
 
-        # trg = torch.zeros(self.MAX_TARGET_SEQUENCE_LEN, self.vocab_size) # zero-padded length of gloss sequence with 2000 unique "words"
-        # trg_length = len(trg_labels)                                     # pass length up until zero-padding (required by CTC loss interface)
-        # for i, item in enumerate(trg_labels):
-        #    trg[i,item] = 1
-
-        return images, (trg, trg_length)
+        return images, (torch.tensor(trg_labels, dtype=torch.int32), trg_length)
+        # return images, images.size(1), trg_labels, trg_length
 
     
     def __len__(self):
