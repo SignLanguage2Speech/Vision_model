@@ -13,7 +13,7 @@ from torchaudio.models.decoder import ctc_decoder
 from torchmetrics.functional import word_error_rate
 
 from utils.load_weigths import load_PHOENIX_weights
-from datasets.PHOENIXDataset import PhoenixDataset, collator
+from datasets.PHOENIXDataset import PhoenixDataset, collator, DataAugmentations
 from models.S3D_backbone import VisualEncoder
 from datasets.preprocess_PHOENIX import getVocab, preprocess_df
 
@@ -57,17 +57,21 @@ def main():
     val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
     test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
 
-    dataloadersTrain = getTrainLoaders(train_df, lambda data: collator(data, split_type='train'), dp, CFG)
+    train_augmentations = DataAugmentations(split_type='train')
+    dataloadersTrain = getTrainLoaders(train_df, lambda data: collator(data, train_augmentations), dp, CFG)
     PhoenixVal = PhoenixDataset(val_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='dev')
     PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='test')
     
+    val_augmentations = DataAugmentations()
     dataloaderVal = DataLoader(PhoenixVal, batch_size=1, 
                                    shuffle=False,
-                                   num_workers=CFG.num_workers)
+                                   num_workers=CFG.num_workers,
+                                   collate_fn=lambda data: collator(data, train_augmentations))
     # TODO actually use this 🤡
     dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
                                    shuffle=False,
-                                   num_workers=CFG.num_workers)
+                                   num_workers=CFG.num_workers,
+                                   collate_fn=lambda data: collator(data, train_augmentations))
 
     ################## Initialization ##################
     model = VisualEncoder(CFG.VOCAB_SIZE + 1).to(device)
