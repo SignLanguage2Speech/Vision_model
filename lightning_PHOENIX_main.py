@@ -21,7 +21,7 @@ def main():
         accelerator='gpu', 
         devices=num_gpu,
         default_root_dir="/work3/s204503/bach-models/ctc-models",
-        # strategy='ddp', replace_sampler_ddp=False
+        strategy='ddp', replace_sampler_ddp=False
         )
     trainer.fit(model)
 

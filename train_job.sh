@@ -3,9 +3,9 @@
 ### –- specify queue --
 #BSUB -q gpua100
 ### -- set the job Name --
-#BSUB -J CTC_large_bs_singleGPU
+#BSUB -J CTC_large_bs
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 8
+#BSUB -n 16
 ### -- Select the resources: gpus in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process:mps=yes"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now

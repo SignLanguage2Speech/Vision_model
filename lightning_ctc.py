@@ -163,16 +163,16 @@ class VisualEncoder_lightning(pl.LightningModule):
         optimizer = optim.AdamW(self.model.parameters(),
                         self.cfg.init_lr,
                         weight_decay=self.cfg.weight_decay)
-        # return optimizer
-        # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5*1183*6*self.cfg.n_epochs)
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5*1183*self.cfg.n_epochs)
-        return {
-            "optimizer": optimizer, 
-            "lr_scheduler": {
-                "scheduler": scheduler, 
-                "monitor": "loss" # could be val loss
-                }
-            }
+        return optimizer
+        # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(8000/7*5))
+        # scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5*1183*self.cfg.n_epochs)
+        # return {
+        #     "optimizer": optimizer, 
+        #     "lr_scheduler": {
+        #         "scheduler": scheduler, 
+        #         "monitor": "loss" # could be val loss
+        #         }
+        #     }
 
     def up_down_sample_helper(self, image_seq, max_len):
         img_seq_len = image_seq.size(1)
