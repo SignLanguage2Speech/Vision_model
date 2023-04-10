@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from models.S3D.model import S3D
 from models.utils import WeightsLoader
 
@@ -27,7 +28,10 @@ class S3D_backbone(S3D):
     def forward(self, x):
         x = self.base(x)
         if self.CFG.use_block == 5:
-            return x
+            x = F.avg_pool3d(x, (2, x.size(3), x.size(4)), stride=1)
+            x = self.final_fc(x.view(-1, x.size(2), x.size(1)))
+            return torch.mean(x, 1)
+
         x = torch.mean(x, dim=[3, 4])
         x = x.transpose(1, 2)
         return x

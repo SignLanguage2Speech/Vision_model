@@ -14,7 +14,8 @@ class cfg:
         self.freeze_block = 0 # 0 is unfrozen
         self.weights_filename='WLASL/epoch299.pth.tar'
         self.seq_len=64
-
+        self.num_workers=8
+        self.print_freq = 50
 
 class DataPaths:
   def __init__(self):
@@ -59,15 +60,15 @@ def validate(model, dataloader, criterion, CFG):
   model.eval()
   start = time.time()
   acc = 0
+  Softmax = torch.nn.Softmax(dim=1)
   print("################## Starting validation ##################")
   for i, (ipt, trg) in enumerate(dataloader):
     with torch.no_grad():
 
       ipt = ipt.cuda()
       trg = trg.cuda()
-      #print(f"Input size: {ipt.size()}")
-
-      out = model(ipt)
+    
+      out = Softmax(model(ipt))
       loss = criterion(out, trg)
       losses.append(loss.cpu())
 
@@ -82,3 +83,7 @@ def validate(model, dataloader, criterion, CFG):
 
   acc = acc/len(dataloader.dataset)
   return losses, acc
+
+
+if __name__ == '__main__':
+  main()
