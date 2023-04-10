@@ -14,8 +14,8 @@ from torchmetrics.functional import word_error_rate
 
 from utils.load_weigths import load_PHOENIX_weights
 from datasets.PHOENIXDataset import PhoenixDataset, collator
-from PHOENIX.s3d_backbone import VisualEncoder
-from PHOENIX.preprocess_PHOENIX import getVocab, preprocess_df
+from models.S3D_backbone import VisualEncoder
+from datasets.preprocess_PHOENIX import getVocab, preprocess_df
 
 import pdb
 

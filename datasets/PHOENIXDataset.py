@@ -1,6 +1,6 @@
 ##### Dataset class for Phoenix #####
 import os
-from PHOENIX.preprocess_PHOENIX import preprocess_df
+from datasets.preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
 from torch.utils import data
@@ -178,8 +178,6 @@ def collator(data, data_augmentation):
     targets[i] = pad(trgs[i])
   
   return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
-
-
 
   
 """
