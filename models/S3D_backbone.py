@@ -1,5 +1,5 @@
-import torch.nn as nn
-from S3D.model import S3D
+import torch
+from models.S3D.model import S3D
 
 
 class S3D_backbone(S3D):
@@ -23,5 +23,7 @@ class S3D_backbone(S3D):
         print(f"Loading weights for {ckpt}")
 
     def forward(self, x):
-        out = self.base(x)
-        return out
+        x = self.base(x)
+        x = torch.mean(x, dim=[3, 4])
+        x = x.transpose(1, 2)
+        return x
