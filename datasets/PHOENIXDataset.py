@@ -82,6 +82,20 @@ def pad(images, seq_len):
   return padded_images
 
 
+def get_selected_indexs(input_len, t_min=0.5, t_max=1.5, max_num_frames=400):
+    min_len = int(t_min*input_len)
+    max_len = min(max_num_frames, int(t_max*input_len))
+    output_len = np.random.randint(min_len, max_len+1)
+    output_len += (4-(output_len%4)) if (output_len%4) != 0 else 0
+    if vlen>=output_len: 
+        selected_index = sorted(np.random.permutation(np.arange(input_len))[:output_len])
+    else: 
+        copied_index = np.random.randint(0,input_len,output_len-input_len)
+        selected_index = sorted(np.concatenate([np.arange(input_len), copied_index]))
+    assert len(selected_index) <= max_num_frames, "output_len is larger than max_num_frames"
+    return selected_index, selected_index
+
+
 def downsample(images, seq_len):
   start_idx = np.random.randint(0, images.size(1) - seq_len)
   stop_idx = start_idx + seq_len
@@ -163,7 +177,6 @@ def collator(data):
 
   
   return batch, torch.tensor(ipt_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
-
 
 
   
