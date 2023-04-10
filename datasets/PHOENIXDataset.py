@@ -13,22 +13,6 @@ import pdb
 from math import ceil
 
 def transform_rgb(video):
-  # ipt_np = revert_transform_rgb(ipt[0])
-  w = 240
-  h = 298
-  c = 3
-  fps = 25
-  sec = 10
-  fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-  # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-  _video = cv2.VideoWriter('test_pretransform.mp4', fourcc, float(fps), (w, h))
-  for frame_count in range(len(video)):
-    _img = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-    img = video[frame_count].astype(np.uint8)
-    # pdb.set_trace()
-    _video.write(img)
-  _video.release()
-
   ''' stack & normalization '''
   video = np.concatenate(video, axis=-1)
   video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()
