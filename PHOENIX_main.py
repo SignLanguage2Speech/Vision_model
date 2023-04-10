@@ -13,7 +13,7 @@ from torchaudio.models.decoder import ctc_decoder
 from torchmetrics.functional import word_error_rate
 
 from utils.load_weigths import load_PHOENIX_weights
-from PHOENIX.PHOENIXDataset import PhoenixDataset, collator
+from datasets.PHOENIXDataset import PhoenixDataset, collator
 from PHOENIX.s3d_backbone import VisualEncoder
 from PHOENIX.preprocess_PHOENIX import getVocab, preprocess_df
 
@@ -38,7 +38,7 @@ class cfg:
     self.lr = 1e-3
     self.weight_decay = 1e-3
     self.scheduler_reset_freq = 5
-    self.num_workers = 8 # ! Set to 0 for debugginge
+    self.num_workers = 8 # ! Set to 0 for debugging
     self.print_freq = 100
     self.multipleGPUs = False
     # for data augmentation
@@ -57,7 +57,7 @@ def main():
     val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
     test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
 
-    dataloadersTrain = getTrainLoaders(train_df, collator, dp, CFG)
+    dataloadersTrain = getTrainLoaders(train_df, lambda data: collator(data, split_type='train'), dp, CFG)
     PhoenixVal = PhoenixDataset(val_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='dev')
     PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='test')
     

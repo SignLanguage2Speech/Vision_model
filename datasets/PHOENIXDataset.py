@@ -27,15 +27,34 @@ def revert_transform_rgb(clip):
 
 ############# Data augmentations #############
 class DataAugmentations:
-  def __init__(self):
+  def __init__(self, split_type=None):
     self.H_upsample = 298
     self.W_upsample = 240
     self.H_out = 224
     self.W_out = 224
+    self.split_type = split_type
+    self._center_crop = torchvision.transforms.CenterCrop((self.H_out, self.W_out))
+    self._random_crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
+    self._random_rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0.0, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR)
+    self._upsample_pixels = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
 
+  def __call__(self, vid):
+    if self.split_type == 'train':
+      vid = self.UpsamplePixels(vid)
+      vid = transform_rgb(vid) # convert to tensor, reshape and normalize
+      vid = self.HorizontalFlip(vid)
+      vid = self.RandomCrop(vid)
+      vid = self.RandomRotation(vid)
+    else:
+      # apply validation augmentations
+      vid = self.UpsamplePixels(vid)
+      vid = transform_rgb(vid)
+      vid = self.CenterCrop(vid)
+    return vid
+  
   def UpsamplePixels(self, imgs: np.ndarray):
-    Upsample = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
-    imgs = Upsample(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
+    
+    imgs = self._upsample_pixels(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
     return imgs.permute(0, 2, 3, 1).numpy() # return and revert dim changes
 
   # flip all images in video horizontally with 50% probability
@@ -47,18 +66,15 @@ class DataAugmentations:
   
   # random 224 x 224 crop (same crop for all images in video)
   def RandomCrop(self, imgs):
-    crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
-    return crop(imgs)
+    return self._random_crop(imgs)
   
   # 224 x 224 center crop (all images in video)
   def CenterCrop(self, imgs):
-    crop = torchvision.transforms.CenterCrop((self.H_out, self.W_out))
-    return crop(imgs)
+    return self._center_crop(imgs)
   
   # randomly rotate all images in video with +- 5 degrees.
   def RandomRotation(self, imgs):
-    rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0.0, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR)
-    return rotate(imgs)
+    return self._random_rotate(imgs)
 
 def upsample(images, seq_len):
   images_org = images.detach().clone() # create a clone of original input
@@ -66,7 +82,7 @@ def upsample(images, seq_len):
     repeats = int(np.floor(seq_len / images.size(1)) - 1) # number of concats
     for _ in range(repeats):
       images = torch.cat((images, images_org), dim=1) # concatenate images temporally
-  
+
   if seq_len > images.size(1):
     start_idx = np.random.randint(0, images_org.size(1) - (seq_len - images.size(1))) 
     stop_idx = start_idx + (seq_len - images.size(1))
@@ -111,56 +127,57 @@ class PhoenixDataset(data.Dataset):
           self.df = preprocess_df(df, split, save=False, save_name=None)
   
         self.video_folders = list(self.df['name'])
-        self.DataAugmentation = DataAugmentations()
 
     def __getitem__(self, idx):
         ### Assumes that within a sample (id column in df) there is only one folder named '1' ###
-        # TODO Check that this holds!
         image_folder = os.path.join(self.ipt_dir, self.split, self.video_folders[idx])
-        images = load_imgs(image_folder)
+        # images = load_imgs(image_folder)
+        image_names = os.listdir(image_folder)
+        N = len(image_names)
 
-        if self.split == 'train':
-          images = self.DataAugmentation.UpsamplePixels(images)
-          images = transform_rgb(images) # convert to tensor, reshape and normalize
-          images = self.DataAugmentation.HorizontalFlip(images)
-          images = self.DataAugmentation.RandomCrop(images)
-          images = self.DataAugmentation.RandomRotation(images)
-          
-        # split == 'dev' or 'test'
-        else:
-           # apply validation augmentations
-           images = self.DataAugmentation.UpsamplePixels(images)
-           images = transform_rgb(images)
-           images = self.DataAugmentation.CenterCrop(images)
-
-        ipt_len = images.size(1)
+        ipt_len = torch.Tensor(N)
 
         # make a one-hot vector for target class
         trg_labels = torch.tensor(self.df.iloc[idx]['gloss_labels'], dtype=torch.int32)
         trg_length = len(trg_labels)
 
-        return images, ipt_len, trg_labels, trg_length
+        return image_names, ipt_len, trg_labels, trg_length
 
     def __len__(self):
         return len(self.df)
 
-def collator(data):
-  ipts, ipt_lens, trgs,  trg_lens = list(zip(*data))
-  max_ipt_len = max(ipt_lens)
+def collator(data, data_augmentation):
+  """
+  Receives list of data (tuple) and data_aug (class wrapping relevant augmentations)
+  data tuple = (image_paths, no. of frames in vid, target_labels, no. of target labels)
+  1. select indices from image_paths and perform temporal augmentations
+  2. load images corresponding to selected indices
+  3. perform spatial augmentations
+  """
+  image_path_lists, vid_lens, trgs,  trg_lens = list(zip(*data))
+  max_ipt_len = max(vid_lens)
   max_trg_len = max(trg_lens)
 
-  batch = torch.zeros((len(ipts), 3, max_ipt_len, 224, 224))
+  batch = torch.zeros((len(image_path_lists), 3, max_ipt_len, 224, 224))
   targets = torch.zeros((len(trgs), max_trg_len))
 
-  for i, ipt in enumerate(ipts):
-    if ipt.size(1) > max_ipt_len:
-      batch[i] = upsample(ipt)
-    
+  vids = []
+  for image_paths in image_path_lists:
+    imgs = np.empty((len(image_paths), 260, 210, 3))
+    for i,ipt in enumerate(image_paths):
+      imgs[i,:,:,:] = np.asarray(Image.open(ipt))
+    vids.append(imgs)
+
+  for i, vid in enumerate(vids):
+    # see DataAugmentation.__call__(self, vid)
+    data_augmentation(vid)
+
+    if vid.size(1) > max_ipt_len:
+      batch[i] = upsample(vid)
     pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
     targets[i] = pad(trgs[i])
-
   
-  return batch, torch.tensor(ipt_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
+  return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
 
 
 
