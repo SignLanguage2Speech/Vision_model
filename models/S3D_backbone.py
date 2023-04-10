@@ -2,7 +2,6 @@ import torch.nn as nn
 from S3D.model import S3D
 
 
-
 class S3D_backbone(S3D):
     def __init__(self, use_block=4, freeze_block=0) -> None:
         super(S3D_backbone, self).__init__(num_class=400, use_block=use_block)
@@ -18,7 +17,10 @@ class S3D_backbone(S3D):
         
 
 
-
+    def load_weights(self, model, ckpt='WLASL'):
+        ckpts = ['phoenix', 'wlasl', 'kinetics', 'how2sign']
+        assert(ckpt.lower() in ckpts, print(f"{ckpt} is not a valid checkpoint!\n Valid ones are:\n{ckpts}"))
+        print(f"Loading weights for {ckpt}")
 
     def forward(self, x):
         out = self.base(x)
