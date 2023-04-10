@@ -90,6 +90,28 @@ def upsample(images, seq_len):
 
   return images
 
+
+def pad(images, seq_len):
+  padding = images[-1,:,:,:].unsqueeze(0) 
+  padding = torch.tile(padding, [seq_len-len(images), 1, 1, 1]) 
+  padded_images = torch.cat([images, padding], dim=0)
+  return padded_images
+
+
+def get_selected_indexs(input_len, t_min=0.5, t_max=1.5, max_num_frames=400):
+    min_len = int(t_min*input_len)
+    max_len = min(max_num_frames, int(t_max*input_len))
+    output_len = np.random.randint(min_len, max_len+1)
+    output_len += (4-(output_len%4)) if (output_len%4) != 0 else 0
+    if vlen>=output_len: 
+        selected_index = sorted(np.random.permutation(np.arange(input_len))[:output_len])
+    else: 
+        copied_index = np.random.randint(0,input_len,output_len-input_len)
+        selected_index = sorted(np.concatenate([np.arange(input_len), copied_index]))
+    assert len(selected_index) <= max_num_frames, "output_len is larger than max_num_frames"
+    return selected_index, selected_index
+
+
 def downsample(images, seq_len):
   start_idx = np.random.randint(0, images.size(1) - seq_len)
   stop_idx = start_idx + seq_len
@@ -105,13 +127,7 @@ def load_imgs(ipt_dir):
     imgs[i,:,:,:] = np.asarray(Image.open(os.path.join(ipt_dir, image_names[i])))
   
   return imgs
-  
-"""
-df : Phoenix dataframe (train, dev or test)
-ipt dir : Directory with videos associated to df
-vocab size : number of unique glosses/words in df
-split : 'train', 'dev' or 'test'
-"""
+
 
 class PhoenixDataset(data.Dataset):
     def __init__(self, df, ipt_dir, vocab_size, split='train'):
@@ -161,6 +177,7 @@ def collator(data, data_augmentation):
   batch = torch.zeros((len(image_path_lists), 3, max_ipt_len, 224, 224))
   targets = torch.zeros((len(trgs), max_trg_len))
 
+<<<<<<< HEAD
   vids = []
   for image_paths in image_path_lists:
     imgs = np.empty((len(image_paths), 260, 210, 3))
@@ -178,6 +195,18 @@ def collator(data, data_augmentation):
     targets[i] = pad(trgs[i])
   
   return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
+=======
+  for i, ipt in enumerate(ipts):
+    if ipt.size(1) > max_ipt_len:
+      batch[i] = pad(ipt)
+    
+    target_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
+    targets[i] = target_pad(trgs[i])
+
+  
+  return batch, torch.tensor(ipt_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
+
+>>>>>>> 3fde961f6e1df7df0781eea2d49a97f3224a0a64
 
   
 """
