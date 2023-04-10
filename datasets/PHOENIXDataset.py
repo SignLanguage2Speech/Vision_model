@@ -74,6 +74,14 @@ def upsample(images, seq_len):
 
   return images
 
+
+def pad(images, seq_len):
+  padding = images[-1,:,:,:].unsqueeze(0) 
+  padding = torch.tile(padding, [seq_len-len(images), 1, 1, 1]) 
+  padded_images = torch.cat([images, padding], dim=0)
+  return padded_images
+
+
 def downsample(images, seq_len):
   start_idx = np.random.randint(0, images.size(1) - seq_len)
   stop_idx = start_idx + seq_len
@@ -89,13 +97,7 @@ def load_imgs(ipt_dir):
     imgs[i,:,:,:] = np.asarray(Image.open(os.path.join(ipt_dir, image_names[i])))
   
   return imgs
-  
-"""
-df : Phoenix dataframe (train, dev or test)
-ipt dir : Directory with videos associated to df
-vocab size : number of unique glosses/words in df
-split : 'train', 'dev' or 'test'
-"""
+
 
 class PhoenixDataset(data.Dataset):
     def __init__(self, df, ipt_dir, vocab_size, split='train'):
@@ -154,10 +156,10 @@ def collator(data):
 
   for i, ipt in enumerate(ipts):
     if ipt.size(1) > max_ipt_len:
-      batch[i] = upsample(ipt)
+      batch[i] = pad(ipt)
     
-    pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
-    targets[i] = pad(trgs[i])
+    target_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
+    targets[i] = target_pad(trgs[i])
 
   
   return batch, torch.tensor(ipt_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
