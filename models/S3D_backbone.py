@@ -1,29 +1,33 @@
 import torch
 from models.S3D.model import S3D
-
+from models.utils import WeightsLoader
 
 class S3D_backbone(S3D):
-    def __init__(self, use_block=4, freeze_block=0) -> None:
-        super(S3D_backbone, self).__init__(num_class=400, use_block=use_block)
+    def __init__(self, CFG) -> None:
+        super(S3D_backbone, self).__init__(use_block=CFG.use_block)
         
         self.frozen_modules = []
-        self.freeze_block = freeze_block
-        self.use_block = use_block
-
+        self.freeze_block = CFG.freeze_block
+        self.use_block = CFG.use_block
+        self.CFG = CFG
+        self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
+        
+        print("LOADING WEIGHTS")
+        print(CFG.weights_filename)
+        self.load_weights()
         # freeze blocks 1... 5
-        if freeze_block > 0:
+        if self.freeze_block > 0:
             for i in range(len(self.base)): # 0, 1, ... 16
                 print("Not implemented...")
-        
 
-
-    def load_weights(self, model, ckpt='WLASL'):
-        ckpts = ['phoenix', 'wlasl', 'kinetics', 'how2sign']
-        assert(ckpt.lower() in ckpts, print(f"{ckpt} is not a valid checkpoint!\n Valid ones are:\n{ckpts}"))
-        print(f"Loading weights for {ckpt}")
+    def load_weights(self):
+        print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")
+        self.weightsLoader.load(verbose=True)
 
     def forward(self, x):
         x = self.base(x)
+        if self.CFG.use_block == 5:
+            return x
         x = torch.mean(x, dim=[3, 4])
         x = x.transpose(1, 2)
         return x

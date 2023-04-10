@@ -6,7 +6,7 @@ class VisualEncoder(nn.Module):
     def __init__(self, n_classes, CFG) -> None:
         super().__init__()
 
-        self.backbone = S3D_backbone(use_block=CFG.use_block, freeze_block=CFG.freeze_block)
+        self.backbone = S3D_backbone(CFG)
         self.head = HeadNetwork(n_classes=400, input_size=832, hidden_size=512, 
                                 ff_size=2048, ff_kernel_size=3, residual_connection=False)
     

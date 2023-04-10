@@ -1,3 +1,4 @@
+import glob
 import torch
 import torch.nn as nn
 
@@ -24,7 +25,6 @@ class MaskedNorm(nn.Module):
         Original Code from:
         https://discuss.pytorch.org/t/batchnorm-for-different-sized-samples-in-batch/44251/8
     """
-
     def __init__(self, num_features=512, norm_type='sync_batch', num_groups=1):
         super().__init__()
         self.norm_type = norm_type
@@ -56,3 +56,30 @@ class MaskedNorm(nn.Module):
             reshaped = x.reshape([-1, self.num_features])
             batched_normed = self.norm(reshaped)
             return batched_normed.reshape([x.shape[0], -1, self.num_features])
+
+class WeightsLoader:
+    def __init__(self, sd, weight_filename) -> None:
+        self.sd = sd
+        self.weight_filename=weight_filename
+        
+    
+    def load(self, verbose=True):
+        file = f'weights/{self.weight_filename}'
+        print("LOADING file: ", file)
+        weights = torch.load(file, map_location='cpu')['state_dict']
+        for name, param in weights.items():
+            #print("name: ", name)
+            # fix naming issues in kinetics state dict
+            name = name.strip('module.')
+            name = name.replace('track', 'tracked')
+            name = name.replace('backbone.', '')
+            name = name.replace('final_fc.1', 'final_fc.0')
+            if name in self.sd:
+                if param.size() == self.sd[name].size():
+                    self.sd[name].copy_(param)
+                else:
+                    if verbose:
+                        print(f"Dimensions do not match...\n parameter: {name} has size {param.size()}\n Original size is: {self.sd[name].size()}")
+            else:
+                if verbose:
+                    print(f"Param {name} not in state dict")
