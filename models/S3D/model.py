@@ -24,7 +24,7 @@ class S3D(nn.Module):
 
         blocks = [block_1, block_2, block_3, block_4, block_5]
         for i in range(use_block):
-            base_seq += blocks[i]
+            base_seq += self.blocks[i]
             self.base = nn.Sequential(*base_seq)
 
         # if vanilla S3D is being trained

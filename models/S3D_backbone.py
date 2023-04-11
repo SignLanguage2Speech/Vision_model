@@ -6,20 +6,23 @@ from models.utils import WeightsLoader
 class S3D_backbone(S3D):
     def __init__(self, CFG) -> None:
         super(S3D_backbone, self).__init__(use_block=CFG.use_block)
-        
-        self.frozen_modules = []
-        self.freeze_block = CFG.freeze_block
-        self.use_block = CFG.use_block
+
         self.CFG = CFG
+        self.frozen_modules = []
+        self.freeze = CFG.freeze
+        self.use_block = CFG.use_block
         self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
         
         print("LOADING WEIGHTS")
         print(CFG.weights_filename)
         self.load_weights()
+        
         # freeze blocks 1... 5
-        if self.freeze_block > 0:
-            for i in range(len(self.base)): # 0, 1, ... 16
-                print("Not implemented...")
+        if self.freeze:
+            for m in self.base:
+                for name, param in m.named_parameters():
+                    param.requires_grad = False
+            m.eval()
 
     def load_weights(self):
         print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")

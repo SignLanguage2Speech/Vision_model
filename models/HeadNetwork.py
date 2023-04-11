@@ -1,13 +1,13 @@
 import torch.nn as nn
-from models.utils import PositionalEncoding, MaskedNorm
+from models.utils import PositionalEncoding, MaskedNorm, WeightsLoader
 
 class HeadNetwork(nn.Module):
-    def __init__(self, n_classes, input_size, hidden_size, ff_size, ff_kernel_size, residual_connection=True) -> None:
+    def __init__(self, CFG, n_classes, input_size, hidden_size, ff_size, ff_kernel_size, residual_connection) -> None:
         super().__init__()
         self.residual_connection = residual_connection
         self.layer_norm1 = nn.LayerNorm(input_size, eps=1e-06)
         self.fc1 = nn.Linear(input_size, hidden_size)
-        self.bn1 = MaskedNorm(num_features=hidden_size, norm_type='batch')
+        self.bn1 = nn.BatchNorm1d(num_features=hidden_size)
         self.relu1 = nn.ReLU()
 
         self.PE = PositionalEncoding(d_model=hidden_size, N=10000)
@@ -27,11 +27,13 @@ class HeadNetwork(nn.Module):
         self.layer_norm2 = nn.LayerNorm(hidden_size, eps=1e-06)
         self.layer_norm3 = nn.LayerNorm(hidden_size, eps=1e-06)
         self.translation_layer = nn.Linear(hidden_size, n_classes)
+
+        self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
     
-    def load_weights(self, model, ckpt):
-        ckpts = ['phoenix', 'wlasl', 'kinetics', 'how2sign']
-        assert(ckpt.lower() in ckpts, print(f"{ckpt} is not a valid checkpoint!\n Valid ones are:\n{ckpts}"))
-        print(f"Loading weights for {ckpt}")
+    def load_weights(self):
+        print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")
+        self.weightsLoader.load(verbose=True)
+        
         
 
     def forward(self, x, mask):

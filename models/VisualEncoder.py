@@ -3,12 +3,12 @@ from models.S3D_backbone import S3D_backbone
 import torch.nn as nn
 
 class VisualEncoder(nn.Module):
-    def __init__(self, n_classes, CFG) -> None:
+    def __init__(self, CFG) -> None:
         super().__init__()
 
         self.backbone = S3D_backbone(CFG)
-        self.head = HeadNetwork(n_classes=400, input_size=832, hidden_size=512, 
-                                ff_size=2048, ff_kernel_size=3, residual_connection=False)
+        self.head = HeadNetwork(n_classes=CFG.n_classes, input_size=CFG.input_size, hidden_size=CFG.hidden_size, 
+                                ff_size=CFG.ff_size, ff_kernel_size=CFG.ff_kernel_size, residual_connection=CFG.residual_connection)
     
         self.ctc_loss = nn.CTCLoss(blank=0, reduction='sum', zero_infinity=True)
 
@@ -20,6 +20,10 @@ class VisualEncoder(nn.Module):
                              trg_lens)
         return loss / log_probs.size(0) # divide with batch size
     
+    def load_weights(self):
+        print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")
+        self.weightsLoader.load(verbose=True)
+
     def decode(self, logits, beam_size, ipt_lens):
 
         pass
