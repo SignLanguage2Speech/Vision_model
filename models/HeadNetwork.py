@@ -47,7 +47,7 @@ class HeadNetwork(nn.Module):
         x = self.bn1(x.transpose(1, 2)) # N x 512 x T/4
         x = self.relu1(x)
 
-        x = self.PE(x.transpose(1, 2))
+        x = self.PE(x.transpose(1, 2)) # N x T/4 x 512
         x = self.dropout1(x)
         # temporal convolutional block
         if self.residual_connection:

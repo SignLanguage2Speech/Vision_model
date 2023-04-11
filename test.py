@@ -11,3 +11,6 @@ from configs.VisualEncoderConfig import cfg
 
 CFG = cfg()
 model = VisualEncoder(CFG)
+ipt = torch.zeros(1, 3, 100, 224, 224)
+out = model(ipt)
+print(out.size())
