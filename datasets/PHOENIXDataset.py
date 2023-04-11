@@ -1,6 +1,6 @@
 ##### Dataset class for Phoenix #####
 import os
-from datasets.preprocess_PHOENIX import preprocess_df
+from preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
 from torch.utils import data
@@ -9,6 +9,8 @@ import pandas as pd
 import subprocess
 from PIL import Image
 import pdb
+
+from math import ceil
 
 def transform_rgb(video):
   ''' stack & normalization '''
@@ -39,6 +41,7 @@ class DataAugmentations:
     self._upsample_pixels = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
 
   def __call__(self, vid):
+    # pdb.set_trace()
     if self.split_type == 'train':
       vid = self.UpsamplePixels(vid)
       vid = transform_rgb(vid) # convert to tensor, reshape and normalize
@@ -53,7 +56,6 @@ class DataAugmentations:
     return vid
   
   def UpsamplePixels(self, imgs: np.ndarray):
-    
     imgs = self._upsample_pixels(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
     return imgs.permute(0, 2, 3, 1).numpy() # return and revert dim changes
 
@@ -90,13 +92,12 @@ def upsample(images, seq_len):
 
   return images
 
-
+# pad using replication strategy
 def pad(images, seq_len):
-  padding = images[-1,:,:,:].unsqueeze(0) 
-  padding = torch.tile(padding, [seq_len-len(images), 1, 1, 1]) 
-  padded_images = torch.cat([images, padding], dim=0)
+  padding = images[:,-1,:,:].unsqueeze(1) 
+  padding = torch.tile(padding, [1, seq_len-images.size(1), 1, 1]) 
+  padded_images = torch.cat([images, padding], dim=1)
   return padded_images
-
 
 def get_selected_indexs(input_len, t_min=0.5, t_max=1.5, max_num_frames=400):
     min_len = int(t_min*input_len)
@@ -109,7 +110,8 @@ def get_selected_indexs(input_len, t_min=0.5, t_max=1.5, max_num_frames=400):
         copied_index = np.random.randint(0,input_len,output_len-input_len)
         selected_index = sorted(np.concatenate([np.arange(input_len), copied_index]))
     assert len(selected_index) <= max_num_frames, "output_len is larger than max_num_frames"
-    return selected_index, selected_index
+    # pdb.set_trace()
+    return selected_index, len(selected_index)
 
 
 def downsample(images, seq_len):
@@ -148,10 +150,13 @@ class PhoenixDataset(data.Dataset):
         ### Assumes that within a sample (id column in df) there is only one folder named '1' ###
         image_folder = os.path.join(self.ipt_dir, self.split, self.video_folders[idx])
         # images = load_imgs(image_folder)
-        image_names = os.listdir(image_folder)
+        image_names = np.sort(os.listdir(image_folder))
+        image_names = [os.path.join(image_folder,img_name) for img_name in image_names]
         N = len(image_names)
 
-        ipt_len = torch.Tensor(N)
+        # ipt_len = torch.Tensor(N)
+        # ipt_len = ceil(N/4)
+        ipt_len = N
 
         # make a one-hot vector for target class
         trg_labels = torch.tensor(self.df.iloc[idx]['gloss_labels'], dtype=torch.int32)
@@ -170,13 +175,25 @@ def collator(data, data_augmentation):
   2. load images corresponding to selected indices
   3. perform spatial augmentations
   """
-  image_path_lists, vid_lens, trgs,  trg_lens = list(zip(*data))
+  image_path_lists, vid_lens, trgs,  trg_lens = [list(x) for x in list(zip(*data))] # ! Might be inefficient!
+
+  vids = []
+  for i,image_paths in enumerate(image_path_lists):
+    selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=0.5, t_max=1.5, max_num_frames=400)
+    vid_lens[i] = new_len
+    image_paths = [image_paths[idx] for idx in selected_indexs]
+    imgs = np.empty((len(image_paths), 260, 210, 3))
+    for j,ipt in enumerate(image_paths):
+      imgs[j,:,:,:] = np.asarray(Image.open(ipt))
+    vids.append(imgs)
+
   max_ipt_len = max(vid_lens)
   max_trg_len = max(trg_lens)
 
   batch = torch.zeros((len(image_path_lists), 3, max_ipt_len, 224, 224))
   targets = torch.zeros((len(trgs), max_trg_len))
 
+<<<<<<< HEAD
   vids = []
   for image_paths in image_path_lists:
     imgs = np.empty((len(image_paths), 260, 210, 3))
@@ -184,19 +201,24 @@ def collator(data, data_augmentation):
       imgs[i,:,:,:] = np.asarray(Image.open(ipt))
     vids.append(imgs)
 
+=======
+>>>>>>> 17667d960bc2ad45f231d72c417960e1d713eedd
   for i, vid in enumerate(vids):
     # see DataAugmentation.__call__(self, vid)
-    data_augmentation(vid)
-
-    if vid.size(1) > max_ipt_len:
-      batch[i] = upsample(vid)
-    pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
-    targets[i] = pad(trgs[i])
+    vid = data_augmentation(vid)
+    if vid.size(1) < max_ipt_len:
+      batch[i] = pad(vid, max_ipt_len)
+    trg_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
+    targets[i] = trg_pad(trgs[i])
   
   return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
 
   
+<<<<<<< HEAD
 """
+=======
+
+>>>>>>> 17667d960bc2ad45f231d72c417960e1d713eedd
 from torch.utils.data import DataLoader
 
 class DataPaths:
@@ -220,15 +242,36 @@ PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split=
 #z = zip(*D)
 #print(list(z))
 
-dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
+train_augmentations = DataAugmentations(split_type='train')
+dataloaderTest = DataLoader(PhoenixTest, batch_size=2, 
                                    shuffle=False,
                                    num_workers=0,
-                                   collate_fn=collator)
+                                   collate_fn=lambda data: collator(data, train_augmentations)
+                                   )
+if __name__ == '__main__':
+  import cv2
 
-for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
-  print("IPTT", ipt.size())
-  print(ipt_len)
-  print("TRGG", trg.size())
-  print(trg_len)
+  for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
+    # pdb.set_trace()
+    ipt_np = revert_transform_rgb(ipt[1])
+    w = h = 224
+    c = 3
+    fps = 25
+    sec = 10
+    
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
+    for frame_count in range(len(ipt_np)):
+      # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+      img = ipt_np[frame_count].astype(np.uint8)
+      # pdb.set_trace()
+      video.write(img)
+    video.release()
 
-"""
+    print("IPTT", ipt.size())
+    print(ipt_len)
+    print("TRGG", trg.size())
+    print(trg_len)
+    break
+

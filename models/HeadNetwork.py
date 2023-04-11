@@ -1,24 +1,29 @@
+import torch
 import torch.nn as nn
-
+from models.utils import PositionalEncoding, WeightsLoader
 
 class HeadNetwork(nn.Module):
-    def __init__(self, n_classes, input_size, hidden_size, ff_size, ff_kernel_size, residual_connection=True) -> None:
+    def __init__(self, CFG) -> None:
         super().__init__()
-        self.residual_connection = residual_connection
-        self.head1 = nn.Sequential(
-                    nn.Linear(input_size, hidden_size),
-                    MaskedNorm(num_features=hidden_size),
-                    nn.ReLU(),
-                    PositionalEncoding(hidden_size),
-                    nn.Droput(p=0.1)
-                    )
+        self.residual_connection = CFG.residual_connection
+        self.layer_norm1 = nn.LayerNorm(CFG.input_size, eps=1e-06)
+        self.fc1 = nn.Linear(CFG.input_size, CFG.hidden_size)
+        self.bn1 = nn.BatchNorm1d(num_features=CFG.hidden_size)
+        self.relu1 = nn.ReLU()
+
+        self.PE = PositionalEncoding(d_model=CFG.hidden_size, N=10000)
+        self.dropout1 = nn.Dropout(0.1)
+        self.pe = nn.Sequential(
+                    PositionalEncoding(d_model=CFG.hidden_size, N=10000),
+                    nn.Dropout(p=0.1))
         
         self.temp_conv_block = nn.Sequential(
-                                nn.Conv1d(hidden_size, ff_size, kernel_size=3, stride=1, padding='same'),
+                                nn.Conv1d(CFG.hidden_size, CFG.ff_size, kernel_size=CFG.ff_kernel_size, stride=1, padding='same'),
                                 nn.ReLU(),
                                 nn.Dropout(p=0.1),
-                                nn.Conv1d(ff_size, hidden_size, kernel_size=3, stride=1, padding='same'),
+                                nn.Conv1d(CFG.ff_size, CFG.hidden_size, kernel_size=CFG.ff_kernel_size, stride=1, padding='same'),
                                 nn.Dropout(p=0.1))
+<<<<<<< HEAD
         
         self.layer_norm = nn.LayerNorm(hidden_size, eps=1e-06)
 
@@ -32,10 +37,42 @@ class HeadNetwork(nn.Module):
     def forward(self, x):
         # x = [N x T x 832]
         x2 = self.head1(x)
-        if self.residual_connection:
-            x2 = self.temp_conv_block(x2) + x
-        else:
-            x2 = self.temp_conv_block(x2)
-        logits = self.translation_layer(x2)
+=======
 
-        return logits
+        
+        self.layer_norm2 = nn.LayerNorm(CFG.hidden_size, eps=1e-06)
+        self.layer_norm3 = nn.LayerNorm(CFG.hidden_size, eps=1e-06)
+
+        self.translation_layer = nn.Linear(CFG.hidden_size, CFG.n_classes)
+        self.Softmax = nn.Softmax(dim=-1)
+
+        self.weightsLoader = WeightsLoader(self.state_dict(), CFG.head_weights_filename)
+    
+    def load_weights(self):
+        print(f"Loading weights from {self.CFG.head_weights_filename.split('/')[0]}")
+        self.weightsLoader.load(verbose=True)
+
+    def forward(self, x, mask):
+        #Input: x = [N x T/4 x 832]
+
+        # Head
+        x = self.layer_norm1(x)
+        x = self.fc1(x)
+        x = self.bn1(x, mask)
+        x = self.relu1(x)
+
+        x = self.PE(x)
+        x = self.dropout1(x)
+
+        # temporal convolutional block
+>>>>>>> 17667d960bc2ad45f231d72c417960e1d713eedd
+        if self.residual_connection:
+            x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2) + x 
+        else:
+            x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2)
+        x = self.layer_norm3(x)
+
+        # gloss translation layer
+        logits = self.translation_layer(x)
+        gloss_probs = self.Softmax(logits)
+        return gloss_probs
