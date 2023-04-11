@@ -1,16 +1,19 @@
 from models.HeadNetwork import HeadNetwork
 from models.S3D_backbone import S3D_backbone
-import torch.nn as nn
+from models.utils import WeightsLoader
+import torch
 
-class VisualEncoder(nn.Module):
+class VisualEncoder(torch.nn.Module):
     def __init__(self, CFG) -> None:
         super().__init__()
 
         self.backbone = S3D_backbone(CFG)
         self.head = HeadNetwork(n_classes=CFG.n_classes, input_size=CFG.input_size, hidden_size=CFG.hidden_size, 
                                 ff_size=CFG.ff_size, ff_kernel_size=CFG.ff_kernel_size, residual_connection=CFG.residual_connection)
-    
-        self.ctc_loss = nn.CTCLoss(blank=0, reduction='sum', zero_infinity=True)
+        self.weights_loader = WeightsLoader(sd = self.state_dict(), weight_filename=CFG.weight_filename)
+        print("Loading weights for visual encoder")
+        self.weights_loader.load()
+        self.ctc_loss = torch.nn.CTCLoss(blank=0, reduction='sum', zero_infinity=True)
 
     def compute_loss(self, log_probs, ipt_lens, trg, trg_lens):
         # N, T, K --> T, N, K 
@@ -31,5 +34,5 @@ class VisualEncoder(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        logits = self.head(x)
-        
+        head_out = self.head(x)
+        log_probs = torch.log(head_out['gloss_probs'])

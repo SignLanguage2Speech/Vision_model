@@ -67,15 +67,18 @@ class WeightsLoader:
     
     def load(self, verbose=True):
         file = f'weights/{self.weight_filename}'
-        print("LOADING file: ", file)
+        weight_type = self.weight_filename.split('/')[0]
+        print("Loading weights from: ", file)
         weights = torch.load(file, map_location='cpu')['state_dict']
         for name, param in weights.items():
             #print("name: ", name)
             # fix naming issues in kinetics state dict
-            name = name.strip('module.') # clean for kinetics
-            name = name.replace('track', 'tracked') # clean for kinetics
-            name = name.replace('backbone.', '') # clean for WLASL
-            name = name.replace('final_fc.1', 'final_fc.0') # clean for WLASL
+            if weight_type == 'Kinetics':
+                name = name.strip('module.') # clean for kinetics
+                name = name.replace('track', 'tracked') # clean for kinetics
+            elif weight_type == 'WLASL':
+                name = name.replace('backbone.', '') # clean for WLASL
+                name = name.replace('final_fc.1', 'final_fc.0') # clean for WLASL
 
             if name in self.sd:
                 if param.size() == self.sd[name].size():

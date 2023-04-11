@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from models.utils import PositionalEncoding, MaskedNorm, WeightsLoader
 
@@ -26,15 +27,15 @@ class HeadNetwork(nn.Module):
         
         self.layer_norm2 = nn.LayerNorm(hidden_size, eps=1e-06)
         self.layer_norm3 = nn.LayerNorm(hidden_size, eps=1e-06)
+
         self.translation_layer = nn.Linear(hidden_size, n_classes)
+        self.Softmax = nn.Softmax(dim=-1)
 
         self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
     
     def load_weights(self):
         print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")
         self.weightsLoader.load(verbose=True)
-        
-        
 
     def forward(self, x, mask):
         #Input: x = [N x T/4 x 832]
@@ -49,15 +50,13 @@ class HeadNetwork(nn.Module):
         x = self.dropout1(x)
 
         # temporal convolutional block
-        print("BEFORE CONV", x.size())
         if self.residual_connection:
             x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2) + x 
         else:
             x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2)
-        print("AFTER CONV", x.size())
         x = self.layer_norm3(x)
+
         # gloss translation layer
         logits = self.translation_layer(x)
-        
-        print("Logits: ", logits.size())
-        return logits
+        gloss_probs = self.Softmax(logits)
+        return gloss_probs

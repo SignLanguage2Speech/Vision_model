@@ -11,12 +11,11 @@ class S3D_backbone(S3D):
         self.frozen_modules = []
         self.freeze = CFG.freeze
         self.use_block = CFG.use_block
-        self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
-        
-        print("LOADING WEIGHTS")
-        print(CFG.weights_filename)
-        self.load_weights()
-        
+        #self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
+        #print("Loading weights for S3D backbone")
+        #print(CFG.weights_filename)
+        #self.load_weights()
+
         # freeze blocks 1... 5
         if self.freeze:
             for m in self.base:
