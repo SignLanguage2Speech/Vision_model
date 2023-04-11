@@ -11,7 +11,8 @@ class S3D_backbone(S3D):
         self.frozen_modules = []
         self.freeze = CFG.freeze
         self.use_block = CFG.use_block
-        #self.weightsLoader = WeightsLoader(self.state_dict(), CFG.weights_filename)
+
+        self.weightsLoader = WeightsLoader(self.state_dict(), CFG.backbone_weights_filename)
         #print("Loading weights for S3D backbone")
         #print(CFG.weights_filename)
         #self.load_weights()
@@ -24,7 +25,7 @@ class S3D_backbone(S3D):
             m.eval()
 
     def load_weights(self):
-        print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")
+        print(f"Loading weights from {self.CFG.backbone_weights_filename.split('/')[0]}")
         self.weightsLoader.load(verbose=True)
 
     def forward(self, x):

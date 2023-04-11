@@ -1,6 +1,6 @@
 class cfg:
     def __init__(self) -> None:
-        self.n_classes = None
+        self.n_classes = 1085
         # S3D backbone
         self.use_block = 4 # use everything except lass block
         self.freeze = False
@@ -14,6 +14,7 @@ class cfg:
         self.num_workers = 8
         self.print_freq = 50
         self.batch_size = 8
-        self.weights_filename = None #'WLASL/epoch299.pth.tar'
+        self.backbone_weights_filename = 'WLASL/epoch299.pth.tar'
+        self.head_weights_filename = None
 
 

@@ -8,11 +8,20 @@ class VisualEncoder(torch.nn.Module):
         super().__init__()
 
         self.backbone = S3D_backbone(CFG)
-        self.head = HeadNetwork(n_classes=CFG.n_classes, input_size=CFG.input_size, hidden_size=CFG.hidden_size, 
-                                ff_size=CFG.ff_size, ff_kernel_size=CFG.ff_kernel_size, residual_connection=CFG.residual_connection)
-        self.weights_loader = WeightsLoader(sd = self.state_dict(), weight_filename=CFG.weight_filename)
-        print("Loading weights for visual encoder")
-        self.weights_loader.load()
+        self.head = HeadNetwork(CFG)
+        #self.weights_loader = WeightsLoader(sd = self.state_dict(), weight_filename=CFG.weights_filename)
+
+        if CFG.backbone_weights_filename != None:
+            print("Loading weights for S3D backbone")
+            self.backbone.weightsLoader.load()
+        else:
+            print("Training backbone from scratch")
+        if CFG.head_weights_filename != None:
+            print("Loading weights for head network")
+            self.head.weightsLoader.load()
+        else:
+            print("Training head network from scratch")
+
         self.ctc_loss = torch.nn.CTCLoss(blank=0, reduction='sum', zero_infinity=True)
 
     def compute_loss(self, log_probs, ipt_lens, trg, trg_lens):
