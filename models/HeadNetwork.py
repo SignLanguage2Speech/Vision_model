@@ -19,7 +19,7 @@ class HeadNetwork(nn.Module):
                                 nn.Dropout(p=0.1),
                                 nn.Conv1d(ff_size, hidden_size, kernel_size=3, stride=1, padding='same'),
                                 nn.Dropout(p=0.1))
-
+        
         self.layer_norm = nn.LayerNorm(hidden_size, eps=1e-06)
 
         self.translation_layer = nn.Linear(hidden_size, n_classes)
@@ -29,7 +29,6 @@ class HeadNetwork(nn.Module):
         assert(ckpt.lower() in ckpts, print(f"{ckpt} is not a valid checkpoint!\n Valid ones are:\n{ckpts}"))
         print(f"Loading weights for {ckpt}")
         
-
     def forward(self, x):
         # x = [N x T x 832]
         x2 = self.head1(x)
