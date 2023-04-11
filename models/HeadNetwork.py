@@ -23,21 +23,6 @@ class HeadNetwork(nn.Module):
                                 nn.Dropout(p=0.1),
                                 nn.Conv1d(CFG.ff_size, CFG.hidden_size, kernel_size=CFG.ff_kernel_size, stride=1, padding='same'),
                                 nn.Dropout(p=0.1))
-<<<<<<< HEAD
-        
-        self.layer_norm = nn.LayerNorm(hidden_size, eps=1e-06)
-
-        self.translation_layer = nn.Linear(hidden_size, n_classes)
-    
-    def load_weights(self, model, ckpt='WLASL'):
-        ckpts = ['phoenix', 'wlasl', 'kinetics', 'how2sign']
-        assert(ckpt.lower() in ckpts, print(f"{ckpt} is not a valid checkpoint!\n Valid ones are:\n{ckpts}"))
-        print(f"Loading weights for {ckpt}")
-        
-    def forward(self, x):
-        # x = [N x T x 832]
-        x2 = self.head1(x)
-=======
 
         
         self.layer_norm2 = nn.LayerNorm(CFG.hidden_size, eps=1e-06)
@@ -52,20 +37,19 @@ class HeadNetwork(nn.Module):
         print(f"Loading weights from {self.CFG.head_weights_filename.split('/')[0]}")
         self.weightsLoader.load(verbose=True)
 
-    def forward(self, x, mask):
+    def forward(self, x):
         #Input: x = [N x T/4 x 832]
 
         # Head
         x = self.layer_norm1(x)
         x = self.fc1(x)
-        x = self.bn1(x, mask)
+        
+        x = self.bn1(x.transpose(1, 2)) # N x 512 x T/4
         x = self.relu1(x)
 
-        x = self.PE(x)
+        x = self.PE(x.transpose(1, 2))
         x = self.dropout1(x)
-
         # temporal convolutional block
->>>>>>> 17667d960bc2ad45f231d72c417960e1d713eedd
         if self.residual_connection:
             x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2) + x 
         else:

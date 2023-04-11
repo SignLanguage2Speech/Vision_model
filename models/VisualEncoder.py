@@ -43,5 +43,5 @@ class VisualEncoder(torch.nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        head_out = self.head(x)
-        log_probs = torch.log(head_out['gloss_probs'])
+        gloss_probs = self.head(x)
+        return gloss_probs
