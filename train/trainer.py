@@ -12,6 +12,7 @@ from utils.load_weigths import load_PHOENIX_weights
 from utils.load_checkpoint import load_checkpoint
 from utils.tokens_to_sent import tokens_to_sent
 from utils.save_checkpoint import save_checkpoint
+from utils.secondary_word_error_rate import wer_list
 
 def get_train_modules(model, dataloader_train, CFG):
 
@@ -19,6 +20,7 @@ def get_train_modules(model, dataloader_train, CFG):
     optimizer = optim.AdamW(
         model.parameters(),
         lr = CFG.lr,
+        betas = CFG.betas,
         weight_decay = CFG.weight_decay)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, 
@@ -31,13 +33,6 @@ def get_train_modules(model, dataloader_train, CFG):
         val_word_error_rates = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
         CFG.start_epoch = current_epoch
     else:
-        optimizer = optim.AdamW(
-            model.parameters(),
-            lr = CFG.lr,
-            weight_decay = CFG.weight_decay)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, 
-            T_max = CFG.n_epochs)
         train_losses = []
         train_word_error_rates = []
         val_losses = []
@@ -65,6 +60,9 @@ def get_train_modules(model, dataloader_train, CFG):
     return optimizer, criterion, scheduler, CTC_decoder, train_losses, train_word_error_rates, val_losses, val_word_error_rates
 
 def train(model, dataloader_train, dataloader_val, CFG):
+
+    ### printing training ###
+    print("-"*10 + "STARTING TRAINING" + "-"*10)
     
     ### initialize training modules ###
     optimizer, criterion, scheduler, \
@@ -155,6 +153,7 @@ def validate(model, dataloader, criterion, decoder, CFG):
     model.eval()
     start = time.time()
     word_error_rates = []
+    secondary_word_error_rates = []
 
     ### iterature through dataloader ###
     for i, (ipt, _, trg, trg_len) in enumerate(dataloader):
@@ -178,15 +177,17 @@ def validate(model, dataloader, criterion, decoder, CFG):
                 pred_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in preds]
                 ref_sents = tokens_to_sent(CFG.gloss_vocab, trg[0][:trg_len[0]])
                 word_error_rates.append(word_error_rate(pred_sents, ref_sents).item())
+                secondary_word_error_rates.append(wer_list(ref_sents,pred_sents))
             except IndexError:
                print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
 
             ### print iteration progress ###
             end = time.time()
-            if max(1, i) % (CFG.print_freq/2) == 0:
+            if max(1, i) % (CFG.print_freq) == 0:
                 print("\n" + ("-"*10) + f"Iteration: {itt}/{len(dataloader)}" + ("-"*10))
                 print(f"Avg loss: {np.mean(losses):.6f}")
                 print(f"Avg WER: {np.mean(word_error_rates):.4f}")
+                print(f"Avg Sec. WER: {np.mean(secondary_word_error_rates):.4f}")
                 print(f"Time: {(end - start)/60:.4f} min")
                 print(f"Predictions: {pred_sents}")
                 print(f"References: {ref_sents}")
@@ -194,6 +195,7 @@ def validate(model, dataloader, criterion, decoder, CFG):
     ### print epoch progross ###
     print("\n" + ("-"*10) + f"VALIDATION" + ("-"*10))
     print(f"Avg WER: {np.mean(word_error_rates)}")
+    print(f"Avg WER Sec.: {np.mean(secondary_word_error_rates):.4f}")
     print(f"Avg loss: {np.mean(losses):.6f}")
-    
+
     return losses, word_error_rates

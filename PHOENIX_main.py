@@ -28,38 +28,17 @@ class DataPaths:
     self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
     self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 
-class cfg:
-  def __init__(self):
-    self.start_epoch = 0
-    self.n_epochs = 100
-    self.save_path = os.path.join('/work3/s204138/bach-models', 'PHOENIX_trained_models')
-    self.default_checkpoint = os.path.join(self.save_path, '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc')
-    self.checkpoint_path = None #'/work3/s204138/bach-models/PHOENIX_trained_models/'  # if None train from scratch
-    self.VOCAB_SIZE = 1085
-    self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')
-    self.batch_size = 2
-    self.lr = 1e-4
-    self.weight_decay = 1e-3
-    self.num_workers = 0 # ! Set to 0 for debugging
-    self.print_freq = 100
-    self.multipleGPUs = False
-    # for data augmentation #
-    self.crop_size = 224
-    # device #
-    self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 def main():
 
     ### initialize configs and device ###
-    visual_encoder_CFG = visual_encoder_cfg()
     dp = DataPaths()
-    CFG = cfg()
+    CFG = visual_encoder_cfg()
     torch.backends.cudnn.deterministic = True
     
     ### initialize data ###
-    train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:2]
-    val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')[:2]
+    train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
+    val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
     test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
 
     ### initialize data ###
@@ -89,7 +68,7 @@ def main():
       num_workers=CFG.num_workers) # TODO actually use this 🤡
 
     ### initialize model ###
-    model = VisualEncoder(visual_encoder_CFG).to(CFG.device)
+    model = VisualEncoder(CFG).to(CFG.device)
     
     ### train the model ###
     train(model, dataloader_train, dataloader_val, CFG)

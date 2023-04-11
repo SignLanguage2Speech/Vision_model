@@ -8,6 +8,8 @@ def preprocess_df(df, split, save=False, save_name = "PHOENIX_train_preprocessed
     features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
     gloss_vocab, translation_vocab = getVocab(annotations_path)
 
+    print("-"*10 + f"GLOSS VOCAB SIZE {len(gloss_vocab)}" + "-" * 10)
+
     # add translation and gloss labels
     df = getLabels(df, translation_vocab, gloss_vocab)
        
