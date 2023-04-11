@@ -1,6 +1,6 @@
 ##### Dataset class for Phoenix #####
 import os
-from preprocess_PHOENIX import preprocess_df
+from train_datasets.preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
 from torch.utils import data
@@ -138,12 +138,7 @@ class PhoenixDataset(data.Dataset):
         self.ipt_dir = ipt_dir
         self.split=split
         self.vocab_size = vocab_size
-
-        if self.split == 'train':
-          self.df = df
-        else:
-          self.df = preprocess_df(df, split, save=False, save_name=None)
-  
+        self.df = preprocess_df(df, split, save=False, save_name=None)
         self.video_folders = list(self.df['name'])
 
     def __getitem__(self, idx):
@@ -179,9 +174,11 @@ def collator(data, data_augmentation):
 
   vids = []
   for i,image_paths in enumerate(image_path_lists):
-    selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=0.5, t_max=1.5, max_num_frames=400)
-    vid_lens[i] = new_len
-    image_paths = [image_paths[idx] for idx in selected_indexs]
+    if data_augmentation.split_type == "train":
+      selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=0.5, t_max=1.5, max_num_frames=400)
+      vid_lens[i] = new_len
+      image_paths = [image_paths[idx] for idx in selected_indexs]
+    
     imgs = np.empty((len(image_paths), 260, 210, 3))
     for j,ipt in enumerate(image_paths):
       imgs[j,:,:,:] = np.asarray(Image.open(ipt))
@@ -193,7 +190,6 @@ def collator(data, data_augmentation):
   batch = torch.zeros((len(image_path_lists), 3, max_ipt_len, 224, 224))
   targets = torch.zeros((len(trgs), max_trg_len))
 
-<<<<<<< HEAD
   vids = []
   for image_paths in image_path_lists:
     imgs = np.empty((len(image_paths), 260, 210, 3))
@@ -201,8 +197,6 @@ def collator(data, data_augmentation):
       imgs[i,:,:,:] = np.asarray(Image.open(ipt))
     vids.append(imgs)
 
-=======
->>>>>>> 17667d960bc2ad45f231d72c417960e1d713eedd
   for i, vid in enumerate(vids):
     # see DataAugmentation.__call__(self, vid)
     vid = data_augmentation(vid)
@@ -214,11 +208,7 @@ def collator(data, data_augmentation):
   return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
 
   
-<<<<<<< HEAD
 """
-=======
-
->>>>>>> 17667d960bc2ad45f231d72c417960e1d713eedd
 from torch.utils.data import DataLoader
 
 class DataPaths:
@@ -274,4 +264,4 @@ if __name__ == '__main__':
     print("TRGG", trg.size())
     print(trg_len)
     break
-
+"""

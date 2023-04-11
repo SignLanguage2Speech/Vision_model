@@ -16,5 +16,7 @@ class cfg:
         self.batch_size = 8
         self.backbone_weights_filename = 'WLASL/epoch299.pth.tar'
         self.head_weights_filename = None
+        # verbose for weightloading #
+        self.verbose = False
 
 

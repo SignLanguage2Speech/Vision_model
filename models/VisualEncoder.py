@@ -13,12 +13,12 @@ class VisualEncoder(torch.nn.Module):
 
         if CFG.backbone_weights_filename != None:
             print("Loading weights for S3D backbone")
-            self.backbone.weightsLoader.load()
+            self.backbone.weightsLoader.load(CFG.verbose)
         else:
             print("Training backbone from scratch")
         if CFG.head_weights_filename != None:
             print("Loading weights for head network")
-            self.head.weightsLoader.load()
+            self.head.weightsLoader.load(CFG.verbose)
         else:
             print("Training head network from scratch")
 
@@ -31,10 +31,6 @@ class VisualEncoder(torch.nn.Module):
                              ipt_lens,
                              trg_lens)
         return loss / log_probs.size(0) # divide with batch size
-    
-    def load_weights(self):
-        print(f"Loading weights from {self.CFG.weights_filename.split('/')[0]}")
-        self.weightsLoader.load(verbose=True)
 
     def decode(self, logits, beam_size, ipt_lens):
 

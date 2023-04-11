@@ -12,7 +12,7 @@ class PositionalEncoding(nn.Module):
         pos = torch.arange(N, dtype=torch.float32).reshape(-1, 1)
         A = pos / torch.pow(10000, torch.arange(0, d_model, 2, dtype=torch.float32) / d_model)
 
-        self.PE = torch.zeros(1, N, d_model)
+        self.PE = torch.zeros(1, N, d_model, device = 'cuda' if torch.cuda.is_available() else 'cpu')
         self.PE[:, :, 0::2] = torch.sin(A)
         self.PE[:, :, 1::2] = torch.cos(A)
 

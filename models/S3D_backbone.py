@@ -24,9 +24,9 @@ class S3D_backbone(S3D):
                     param.requires_grad = False
             m.eval()
 
-    def load_weights(self):
+    def load_weights(self, verbose):
         print(f"Loading weights from {self.CFG.backbone_weights_filename.split('/')[0]}")
-        self.weightsLoader.load(verbose=True)
+        self.weightsLoader.load(verbose=verbose)
 
     def forward(self, x):
         x = self.base(x)

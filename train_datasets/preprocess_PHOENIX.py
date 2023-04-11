@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import re
+from itertools import groupby
 
 def preprocess_df(df, split, save=False, save_name = "PHOENIX_train_preprocessed.csv"):
     annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
@@ -8,12 +10,6 @@ def preprocess_df(df, split, save=False, save_name = "PHOENIX_train_preprocessed
 
     # add translation and gloss labels
     df = getLabels(df, translation_vocab, gloss_vocab)
-
-    # split dataframes
-    if split == 'train':
-       df = addLengths(df, features_path, cutoff=330)
-       dataframes = groupByBin(df)
-       return dataframes
        
     if save:
         df.to_csv(os.path.join(annotations_path, save_name))
@@ -26,7 +22,7 @@ def getLabels(df, t_vocab, g_vocab):
     all_glosses = []
     for i in range(len(df)):
         T = df.iloc[i]['translation'].split(' ')
-        G = df.iloc[i]['orth'].split(' ')
+        G = clean_phoenix_glosses(df.iloc[i]['orth']).split(' ')
         T_labels = []
         G_labels = []
         for word in T:
@@ -51,10 +47,10 @@ def getLabels(df, t_vocab, g_vocab):
 
 def getVocab(path):
     train = pd.read_csv(os.path.join(path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
-    chars = '?.,!-_+'
+    chars = '?.,!_+'
 
     # get vocabulary for translations and glosses for the train dataset
-    glosses = list(train['orth']) #+ list(test['orth']) + list(val['orth'])
+    glosses = list(clean_phoenix_glosses(train.iloc[i]['orth']) for i in range(len(train))) #+ list(test['orth']) + list(val['orth'])
     glosses = list(sorted(set([word for sent in glosses for word in sent.replace(chars,'').split(' ')])))
     #print(f"Gloss vocab size: {len(glosses)}")
 
@@ -94,17 +90,56 @@ def groupByBin(df):
     dataframes.append(df_new)
 
   return dataframes
-"""
-########## TEST ##########
-annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
-features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
 
-train = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
-val = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
-test = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
 
-val = preprocess_df(val)
+def clean_phoenix_glosses(prediction):
 
-print(val.head(5))
+    prediction = prediction.strip()
+    prediction = re.sub(r"__LEFTHAND__", "", prediction)
+    prediction = re.sub(r"__EPENTHESIS__", "", prediction)
+    prediction = re.sub(r"__EMOTION__", "", prediction)
+    prediction = re.sub(r"\b__[^_ ]*__\b", "", prediction)
+    prediction = re.sub(r"\bloc-([^ ]*)\b", r"\1", prediction)
+    prediction = re.sub(r"\bcl-([^ ]*)\b", r"\1", prediction)
+    prediction = re.sub(r"\b([^ ]*)-PLUSPLUS\b", r"\1", prediction)
+    prediction = re.sub(r"\b([A-Z][A-Z]*)RAUM\b", r"\1", prediction)
+    prediction = re.sub(r"WIE AUSSEHEN", "WIE-AUSSEHEN", prediction)
+    prediction = re.sub(r"^([A-Z]) ([A-Z][+ ])", r"\1+\2", 
+            prediction)
+    prediction = re.sub(r"[ +]([A-Z]) ([A-Z]) ", r" \1+\2 ", prediction)
+    prediction = re.sub(r"([ +][A-Z]) ([A-Z][ +])", r"\1+\2", prediction)
+    prediction = re.sub(r"([ +][A-Z]) ([A-Z][ +])", r"\1+\2", prediction)
+    prediction = re.sub(r"([ +][A-Z]) ([A-Z][ +])", r"\1+\2", prediction)
+    prediction = re.sub(r"([ +]SCH) ([A-Z][ +])", r"\1+\2", prediction)
+    prediction = re.sub(r"([ +]NN) ([A-Z][ +])", r"\1+\2", prediction)
+    prediction = re.sub(r"([ +][A-Z]) (NN[ +])", r"\1+\2", prediction)
+    prediction = re.sub(r"([ +][A-Z]) ([A-Z])$", r"\1+\2", prediction)
+    prediction = re.sub(r" +", " ", prediction)
+    prediction = re.sub(r"(?<![\w-])(\b[A-Z]+(?![\w-])) \1(?![\w-])", r"\1", prediction)
+    prediction = re.sub(r"(?<![\w-])(\b[A-Z]+(?![\w-])) \1(?![\w-])", r"\1", prediction)
+    prediction = re.sub(r"(?<![\w-])(\b[A-Z]+(?![\w-])) \1(?![\w-])", r"\1", prediction)
+    prediction = re.sub(r"(?<![\w-])(\b[A-Z]+(?![\w-])) \1(?![\w-])", r"\1", prediction)
+    prediction = re.sub(r" +", " ", prediction)
 
-"""
+    prediction = " ".join(
+        " ".join(i[0] for i in groupby(prediction.split(" "))).split()
+    )
+    prediction = prediction.strip()
+
+    return prediction
+
+
+
+# ########## TEST ##########
+# annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
+# features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
+
+# train = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
+# val = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
+# test = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
+
+# val = preprocess_df(val, "dev")
+
+# for i in range(len(val)):
+#   if "WIE" in val.iloc[i]["orth"]:
+#     print(val.iloc[i]["orth"])

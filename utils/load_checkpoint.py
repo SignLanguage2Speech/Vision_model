@@ -2,8 +2,8 @@ import torch
 
 def load_checkpoint(path, model, optimizer, scheduler):
     checkpoint = torch.load(path)
-    model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    model.load_state_dict(checkpoint['model_state_dict'])
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     epoch = checkpoint['epoch']
     train_losses = checkpoint['train_losses']

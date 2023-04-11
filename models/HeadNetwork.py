@@ -33,9 +33,9 @@ class HeadNetwork(nn.Module):
 
         self.weightsLoader = WeightsLoader(self.state_dict(), CFG.head_weights_filename)
     
-    def load_weights(self):
+    def load_weights(self, verbose):
         print(f"Loading weights from {self.CFG.head_weights_filename.split('/')[0]}")
-        self.weightsLoader.load(verbose=True)
+        self.weightsLoader.load(verbose=verbose)
 
     def forward(self, x):
         #Input: x = [N x T/4 x 832]
