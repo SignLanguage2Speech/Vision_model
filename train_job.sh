@@ -11,11 +11,11 @@
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
 #BSUB -W 8:00
 # request 32GB of system-memory
-#BSUB -R "rusage[mem=32GB]"
+#BSUB -R "rusage[mem=70GB]"
 #BSUB -R "select[gpu80gb]"
 
 ### -- set the email address --
-#BSUB -u s200925@student.dtu.dk
+#BSUB -u s204138@student.dtu.dk
 
 ### -- send notification at start --
 #BSUB -B
@@ -32,5 +32,9 @@ module load cuda/12.0
 module load cudnn/v8.3.2.44-prod-cuda-11.X
 
 
-source /zhome/6b/b/151617/env2/bin/activate
-python3 /zhome/6b/b/151617/Vision_model/PHOENIX_main.py
+### source /zhome/6b/b/151617/env2/bin/activate ### Bigom venv
+### python3 /zhome/6b/b/151617/Vision_model/PHOENIX_main.py
+
+source /zhome/d6/f/156047/BachelorProject/Vision_model/bach/bin/activate ### Michael venv
+python3 /zhome/d6/f/156047/BachelorProject/Vision_model/PHOENIX_main.py ###
+

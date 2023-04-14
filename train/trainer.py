@@ -50,14 +50,20 @@ def get_train_modules(model, dataloader_train, CFG):
     )
     criterion = torch.nn.CTCLoss(
         blank=0, 
-        zero_infinity=False, 
+        zero_infinity=True, 
         reduction='mean'
-    ).to(CFG.device) # zero_infinity is for debugging purposes only...
+    ).to(CFG.device)
 
     ### send model to device ###
     model.to(CFG.device)
 
     return optimizer, criterion, scheduler, CTC_decoder, train_losses, train_word_error_rates, val_losses, val_word_error_rates
+
+def isNaN(val):
+    return val != val
+
+import nvidia_smi
+import pdb
 
 def train(model, dataloader_train, dataloader_val, CFG):
 
@@ -69,43 +75,64 @@ def train(model, dataloader_train, dataloader_val, CFG):
     decoder, train_losses, train_word_error_rates, \
     val_losses, val_word_error_rates = get_train_modules(model, dataloader_train, CFG)
 
+    
     ### iterate through specified epochs ###
+    #torch.autograd.detect_anomaly(True)
     for epoch in range(CFG.start_epoch, CFG.n_epochs):
-
         ### initialize epoch variables ###
         losses = []
         model.train()
         start = time.time()
         word_error_rates = []
-
+        #print("###### BEFORE TRAINIG ######")
+        #print_mem_usage(device_idx)
+        #nvidia_smi.nvmlShutdown()
         ### iterate through each batch in dataloader ###
+        print(f"Epoch: {epoch+1}")
         for itt, (ipt, _, trg, trg_len) in enumerate(dataloader_train):
-
+            #print("###### Just loaded batch ######")
+            #print_mem_usage(device_idx)            
             ### structure batch ###
             refs = [t[:trg_len[i]].cpu() for i, t in enumerate(trg)]
             ref_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in refs]
 
             ### get output and calculate loss ###
             out = model(ipt.to(CFG.device))
+            #print("###### Right after .forward ######")
+            #print_mem_usage(device_idx)
+            
             x = out.permute(1, 0, 2)
             trg = torch.concat(refs).to(CFG.device)
             trg_len = trg_len.to(torch.int32)
             ipt_len = torch.full(size=(out.size(0),), fill_value = out.size(1), dtype=torch.int32)
+            
             with torch.backends.cudnn.flags(enabled=False):
                 loss = criterion(torch.log(x), 
                                 trg,
                                 input_lengths=ipt_len,
                                 target_lengths=trg_len)
-
+            """
+            try:
+                if isNaN(loss.detach().cpu().item()):
+                    print("Loss is: ", loss.detach.cpu().item())
+                    print("The predictions were: ")
+                    for i in range(x.size(1)):
+                        print("Predictions: ", torch.argmax(x[:, i, :], dim=0))
+            except AttributeError:
+                pdb.set_trace()
+            """
+            
             ### backprop and steps ###
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            #print("###### Just after backprob and optimization step ######")
+            #print_mem_usage(device_idx)
             
             ### save loss and get preds ###
             try:
                 losses.append(loss.detach().cpu().item())
-                out_d = decoder(torch.exp(out).cpu())
+                out_d = decoder(out.cpu())
                 preds = [p[0].tokens for p in out_d]
                 pred_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in preds]
                 word_error_rates.append(word_error_rate(pred_sents, ref_sents).item())
@@ -145,8 +172,7 @@ def train(model, dataloader_train, dataloader_val, CFG):
 
 
 
-
-def validate(model, dataloader, criterion, decoder, CFG):
+def validate(model, dataloader, criterion, decoder, CFG, decode_func=None):
 
     ### setup validation metrics ###
     losses = []
@@ -161,30 +187,37 @@ def validate(model, dataloader, criterion, decoder, CFG):
 
             ### get model output and calculate loss ###
             out = model(ipt.to(CFG.device))
-            x = out.permute(1, 0, 2)
+            x = out.permute(1, 0, 2)  
             ipt_len = torch.full(size=(1,), fill_value = out.size(1), dtype=torch.int32)
+            """
             with torch.backends.cudnn.flags(enabled=False):
                 loss = criterion(torch.log(x), 
                               trg.to(CFG.device), 
                               input_lengths=ipt_len.to(CFG.device),
                               target_lengths=trg_len.to(CFG.device))
-
+            """
+            loss = criterion(torch.log(x), 
+                              trg, 
+                              input_lengths=ipt_len,
+                              target_lengths=trg_len)
+            
             ### save loss and get preds ###
             try:
+                #print("Predsss", torch.argmax(out, dim=1))
                 losses.append(loss.detach().cpu().item())
-                out_d = decoder(torch.exp(out).cpu())
+                out_d = decoder(out.cpu())
                 preds = [p[0].tokens for p in out_d]
                 pred_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in preds]
                 ref_sents = tokens_to_sent(CFG.gloss_vocab, trg[0][:trg_len[0]])
                 word_error_rates.append(word_error_rate(pred_sents, ref_sents).item())
                 secondary_word_error_rates.append(wer_list(ref_sents,pred_sents))
             except IndexError:
-               print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
+                print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
 
             ### print iteration progress ###
             end = time.time()
             if max(1, i) % (CFG.print_freq) == 0:
-                print("\n" + ("-"*10) + f"Iteration: {itt}/{len(dataloader)}" + ("-"*10))
+                print("\n" + ("-"*10) + f"Iteration: {i}/{len(dataloader)}" + ("-"*10))
                 print(f"Avg loss: {np.mean(losses):.6f}")
                 print(f"Avg WER: {np.mean(word_error_rates):.4f}")
                 print(f"Avg Sec. WER: {np.mean(secondary_word_error_rates):.4f}")
@@ -199,3 +232,13 @@ def validate(model, dataloader, criterion, decoder, CFG):
     print(f"Avg loss: {np.mean(losses):.6f}")
 
     return losses, word_error_rates
+
+
+def print_mem_usage(device_idx):
+    nvidia_smi.nvmlInit()
+    deviceCount = nvidia_smi.nvmlDeviceGetCount()
+    device_idx = 1
+    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(device_idx)
+    info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+    print(f"Device {device_idx}: {nvidia_smi.nvmlDeviceGetName(handle)}, Memory : ({100*info.free/info.total:.4f}% free): {info.total/10**(-9):.3f}(total GB), {info.used/10**(-9):.3f} (used GB)")
+    nvidia_smi.nvmlShutdown()

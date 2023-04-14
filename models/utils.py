@@ -66,10 +66,11 @@ class WeightsLoader:
         
     
     def load(self, verbose=True):
+    
         file = f'weights/{self.weight_filename}'
         weight_type = self.weight_filename.split('/')[0]
-        print("Loading weights from: ", file)
         weights = torch.load(file, map_location='cpu')['state_dict']
+        print("Loading weights from: ", file)
         for name, param in weights.items():
             #print("name: ", name)
             # fix naming issues in kinetics state dict
@@ -89,3 +90,4 @@ class WeightsLoader:
             else:
                 if verbose:
                     print(f"Param {name} not in state dict")
+        

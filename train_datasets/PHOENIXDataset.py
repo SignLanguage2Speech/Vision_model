@@ -45,14 +45,16 @@ class DataAugmentations:
     if self.split_type == 'train':
       vid = self.UpsamplePixels(vid)
       vid = transform_rgb(vid) # convert to tensor, reshape and normalize
-      vid = self.HorizontalFlip(vid)
+      #vid = self.HorizontalFlip(vid)
       vid = self.RandomCrop(vid)
-      vid = self.RandomRotation(vid)
+      #vid = self.RandomRotation(vid)
+      
     else:
       # apply validation augmentations
       vid = self.UpsamplePixels(vid)
       vid = transform_rgb(vid)
       vid = self.CenterCrop(vid)
+      
     return vid
   
   def UpsamplePixels(self, imgs: np.ndarray):
@@ -62,7 +64,7 @@ class DataAugmentations:
   # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
     p = np.random.randint(0, 2)
-    if p < 2: # TODO update this value after testing !!!
+    if p < 1:
       imgs = torchvision.transforms.functional.hflip(imgs)
     return imgs
   
@@ -100,18 +102,36 @@ def pad(images, seq_len):
   return padded_images
 
 def get_selected_indexs(input_len, t_min=0.5, t_max=1.5, max_num_frames=400):
-    min_len = int(t_min*input_len)
-    max_len = min(max_num_frames, int(t_max*input_len))
-    output_len = np.random.randint(min_len, max_len+1)
-    output_len += (4-(output_len%4)) if (output_len%4) != 0 else 0
-    if input_len>=output_len: 
-        selected_index = sorted(np.random.permutation(np.arange(input_len))[:output_len])
-    else: 
-        copied_index = np.random.randint(0,input_len,output_len-input_len)
-        selected_index = sorted(np.concatenate([np.arange(input_len), copied_index]))
-    assert len(selected_index) <= max_num_frames, "output_len is larger than max_num_frames"
-    # pdb.set_trace()
-    return selected_index, len(selected_index)
+    if t_min==1 and t_max==1:
+        if input_len <= max_num_frames:
+            frame_index = np.arange(input_len)
+            valid_len = input_len
+        else:
+            sequence = np.arange(input_len)
+            an = (input_len - max_num_frames)//2
+            en = input_len - max_num_frames - an
+            frame_index = sequence[an: -en]
+            valid_len = max_num_frames
+        
+        if (valid_len % 4) != 0:
+            valid_len -= (valid_len % 4)
+            frame_index = frame_index[:valid_len]
+
+        assert len(frame_index) == valid_len, (frame_index, valid_len)
+        return frame_index, valid_len
+    else:
+      min_len = int(t_min*input_len)
+      max_len = min(max_num_frames, int(t_max*input_len))
+      output_len = np.random.randint(min_len, max_len+1)
+      output_len += (4-(output_len%4)) if (output_len%4) != 0 else 0
+      if input_len>=output_len: 
+          selected_index = sorted(np.random.permutation(np.arange(input_len))[:output_len])
+      else: 
+          copied_index = np.random.randint(0,input_len,output_len-input_len)
+          selected_index = sorted(np.concatenate([np.arange(input_len), copied_index]))
+      assert len(selected_index) <= max_num_frames, "output_len is larger than max_num_frames"
+      # pdb.set_trace()
+      return selected_index, len(selected_index)
 
 
 def downsample(images, seq_len):
@@ -175,14 +195,13 @@ def collator(data, data_augmentation):
   vids = []
   for i,image_paths in enumerate(image_path_lists):
     if data_augmentation.split_type == "train":
-      selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=0.5, t_max=1.5, max_num_frames=400)
+      selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=1, t_max=1, max_num_frames=400)
       vid_lens[i] = new_len
       image_paths = [image_paths[idx] for idx in selected_indexs]
-    
-    imgs = np.empty((len(image_paths), 260, 210, 3))
-    for j,ipt in enumerate(image_paths):
-      imgs[j,:,:,:] = np.asarray(Image.open(ipt))
-    vids.append(imgs)
+    else:
+      selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=1, t_max=1, max_num_frames=400)
+      vid_lens[i] = new_len
+      image_paths = [image_paths[idx] for idx in selected_indexs]
 
   max_ipt_len = max(vid_lens)
   max_trg_len = max(trg_lens)
@@ -196,13 +215,13 @@ def collator(data, data_augmentation):
     for i,ipt in enumerate(image_paths):
       imgs[i,:,:,:] = np.asarray(Image.open(ipt))
     vids.append(imgs)
-
+    
   for i, vid in enumerate(vids):
     # see DataAugmentation.__call__(self, vid)
     vid = data_augmentation(vid)
     if vid.size(1) < max_ipt_len:
       batch[i] = pad(vid, max_ipt_len)
-    trg_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=-1)
+    trg_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=0)
     targets[i] = trg_pad(trgs[i])
   
   return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
@@ -232,7 +251,7 @@ PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split=
 #z = zip(*D)
 #print(list(z))
 
-train_augmentations = DataAugmentations(split_type='train')
+train_augmentations = DataAugmentations(split_type='val')
 dataloaderTest = DataLoader(PhoenixTest, batch_size=2, 
                                    shuffle=False,
                                    num_workers=0,
@@ -265,3 +284,5 @@ if __name__ == '__main__':
     print(trg_len)
     break
 """
+
+

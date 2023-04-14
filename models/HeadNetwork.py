@@ -5,6 +5,7 @@ from models.utils import PositionalEncoding, WeightsLoader
 class HeadNetwork(nn.Module):
     def __init__(self, CFG) -> None:
         super().__init__()
+        self.CFG = CFG
         self.residual_connection = CFG.residual_connection
         self.layer_norm1 = nn.LayerNorm(CFG.input_size, eps=1e-06)
         self.fc1 = nn.Linear(CFG.input_size, CFG.hidden_size)
