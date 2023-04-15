@@ -4,6 +4,7 @@ from models.utils import PositionalEncoding, WeightsLoader
 
 class HeadNetwork(nn.Module):
     def __init__(self, CFG) -> None:
+
         super().__init__()
         self.CFG = CFG
         self.residual_connection = CFG.residual_connection
@@ -14,9 +15,6 @@ class HeadNetwork(nn.Module):
 
         self.PE = PositionalEncoding(d_model=CFG.hidden_size, N=10000)
         self.dropout1 = nn.Dropout(0.1)
-        self.pe = nn.Sequential(
-                    PositionalEncoding(d_model=CFG.hidden_size, N=10000),
-                    nn.Dropout(p=0.1))
         
         self.temp_conv_block = nn.Sequential(
                                 nn.Conv1d(CFG.hidden_size, CFG.ff_size, kernel_size=CFG.ff_kernel_size, stride=1, padding='same'),

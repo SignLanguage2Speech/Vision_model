@@ -13,16 +13,12 @@ class S3D_backbone(S3D):
         self.use_block = CFG.use_block
 
         self.weightsLoader = WeightsLoader(self.state_dict(), CFG.backbone_weights_filename)
-        #print("Loading weights for S3D backbone")
-        #print(CFG.weights_filename)
-        #self.load_weights()
 
         # freeze blocks 1... 5
         if self.freeze:
             for m in self.base:
                 for name, param in m.named_parameters():
                     param.requires_grad = False
-            m.eval()
 
     def load_weights(self, verbose):
         print(f"Loading weights from {self.CFG.backbone_weights_filename.split('/')[0]}")

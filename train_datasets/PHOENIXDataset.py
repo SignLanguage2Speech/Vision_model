@@ -45,9 +45,9 @@ class DataAugmentations:
     if self.split_type == 'train':
       vid = self.UpsamplePixels(vid)
       vid = transform_rgb(vid) # convert to tensor, reshape and normalize
-      #vid = self.HorizontalFlip(vid)
+      vid = self.HorizontalFlip(vid)
       vid = self.RandomCrop(vid)
-      #vid = self.RandomRotation(vid)
+      vid = self.RandomRotation(vid)
       
     else:
       # apply validation augmentations
@@ -168,9 +168,6 @@ class PhoenixDataset(data.Dataset):
         image_names = np.sort(os.listdir(image_folder))
         image_names = [os.path.join(image_folder,img_name) for img_name in image_names]
         N = len(image_names)
-
-        # ipt_len = torch.Tensor(N)
-        # ipt_len = ceil(N/4)
         ipt_len = N
 
         # make a one-hot vector for target class
@@ -192,97 +189,132 @@ def collator(data, data_augmentation):
   """
   image_path_lists, vid_lens, trgs,  trg_lens = [list(x) for x in list(zip(*data))] # ! Might be inefficient!
 
-  vids = []
-  for i,image_paths in enumerate(image_path_lists):
-    if data_augmentation.split_type == "train":
-      selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=1, t_max=1, max_num_frames=400)
-      vid_lens[i] = new_len
-      image_paths = [image_paths[idx] for idx in selected_indexs]
-    else:
-      selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=1, t_max=1, max_num_frames=400)
-      vid_lens[i] = new_len
-      image_paths = [image_paths[idx] for idx in selected_indexs]
+  if data_augmentation.split_type == "train":
+    for i,image_paths in enumerate(image_path_lists):
+        selected_indexs, new_len = get_selected_indexs(vid_lens[i], t_min=0.5, t_max=1.5, max_num_frames=400)
+        vid_lens[i] = new_len
+        image_path_lists[i] = [image_paths[idx] for idx in selected_indexs]
 
   max_ipt_len = max(vid_lens)
   max_trg_len = max(trg_lens)
 
   batch = torch.zeros((len(image_path_lists), 3, max_ipt_len, 224, 224))
   targets = torch.zeros((len(trgs), max_trg_len))
-
-  vids = []
-  for image_paths in image_path_lists:
-    imgs = np.empty((len(image_paths), 260, 210, 3))
-    for i,ipt in enumerate(image_paths):
-      imgs[i,:,:,:] = np.asarray(Image.open(ipt))
-    vids.append(imgs)
-    
-  for i, vid in enumerate(vids):
-    # see DataAugmentation.__call__(self, vid)
+  
+  for i, image_paths in enumrate(image_path_lists):
+    vid = np.empty((len(image_paths), 260, 210, 3))
+    for j,ipt in enumerate(image_paths):
+        vid[j,:,:,:] = np.asarray(Image.open(ipt))
     vid = data_augmentation(vid)
     if vid.size(1) < max_ipt_len:
       batch[i] = pad(vid, max_ipt_len)
+    else:
+      batch[i] = vid
     trg_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=0)
     targets[i] = trg_pad(trgs[i])
+
+  # OLD METHOD  
+
+  # vids = []
+  # for image_paths in image_path_lists:
+  #   imgs = np.empty((len(image_paths), 260, 210, 3))
+  #   for i,ipt in enumerate(image_paths):
+  #     imgs[i,:,:,:] = np.asarray(Image.open(ipt))
+  #   vids.append(imgs)
+
+  # for i, vid in enumerate(vids):
+  #   vid = data_augmentation(vid)
+  #   if vid.size(1) < max_ipt_len:
+  #     batch[i] = pad(vid, max_ipt_len)
+  #   else:
+  #     batch[i] = vid
+  #   trg_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=0)
+  #   targets[i] = trg_pad(trgs[i])
   
   return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
 
-  
-"""
-from torch.utils.data import DataLoader
 
-class DataPaths:
-  def __init__(self):
-    self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
-    self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 
-dp = DataPaths()
-test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
-PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
 
-#data = [PhoenixTest.__getitem__(0), (PhoenixTest.__getitem__(1))]
 
-#ipts, ipt_lens, _, _ = list(zip(*data))
 
-#print(ipt_lens)
-#print(ipts[0].size())
-#max_len = max(ipt_lens)
+# from torch.utils.data import DataLoader
 
-#D = [('1', 'hi', 5), ('2', 'hola', 4)]
-#z = zip(*D)
-#print(list(z))
+# class DataPaths:
+#   def __init__(self):
+#     self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
+#     self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 
-train_augmentations = DataAugmentations(split_type='val')
-dataloaderTest = DataLoader(PhoenixTest, batch_size=2, 
-                                   shuffle=False,
-                                   num_workers=0,
-                                   collate_fn=lambda data: collator(data, train_augmentations)
-                                   )
-if __name__ == '__main__':
-  import cv2
+# dp = DataPaths()
+# test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')[:2]
+# train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:2]
+# PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
+# PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=1085, split='train')
 
-  for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
-    # pdb.set_trace()
-    ipt_np = revert_transform_rgb(ipt[1])
-    w = h = 224
-    c = 3
-    fps = 25
-    sec = 10
+
+# test_augmentations = DataAugmentations(split_type='val')
+# dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
+#                                    shuffle=False,
+#                                    num_workers=0,
+#                                    collate_fn=lambda data: collator(data, test_augmentations)
+#                                    )
+
+# train_augmentations = DataAugmentations(split_type='train')
+# dataloaderTrain = DataLoader(PhoenixTrain, batch_size=1, 
+#                                    shuffle=False,
+#                                    num_workers=0,
+#                                    collate_fn=lambda data: collator(data, train_augmentations)
+#                                    )
+                              
+# if __name__ == '__main__':
+#   import cv2
+
+#   for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
+#     # pdb.set_trace()
+#     ipt_np = revert_transform_rgb(ipt[0])
+#     w = h = 224
+#     c = 3
+#     fps = 25
+#     sec = 10
     
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-    video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
-    for frame_count in range(len(ipt_np)):
-      # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-      img = ipt_np[frame_count].astype(np.uint8)
-      # pdb.set_trace()
-      video.write(img)
-    video.release()
+#     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+#     # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+#     video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
+#     for frame_count in range(len(ipt_np)):
+#       # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+#       img = ipt_np[frame_count].astype(np.uint8)
+#       # pdb.set_trace()
+#       video.write(img)
+#     video.release()
 
-    print("IPTT", ipt.size())
-    print(ipt_len)
-    print("TRGG", trg.size())
-    print(trg_len)
-    break
-"""
+#     print("IPTT", ipt.size())
+#     print(ipt_len)
+#     print("TRGG", trg.size())
+#     print(trg_len)
+#     break
+
+#   for (ipt, ipt_len, trg, trg_len) in dataloaderTrain:
+#     # pdb.set_trace()
+#     ipt_np = revert_transform_rgb(ipt[0])
+#     w = h = 224
+#     c = 3
+#     fps = 25
+#     sec = 10
+    
+#     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+#     # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+#     video = cv2.VideoWriter('train.mp4', fourcc, float(fps), (w, h))
+#     for frame_count in range(len(ipt_np)):
+#       # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+#       img = ipt_np[frame_count].astype(np.uint8)
+#       # pdb.set_trace()
+#       video.write(img)
+#     video.release()
+
+#     print("IPTT", ipt.size())
+#     print(ipt_len)
+#     print("TRGG", trg.size())
+#     print(trg_len)
+#     break
 
 

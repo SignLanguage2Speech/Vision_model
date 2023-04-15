@@ -9,11 +9,10 @@ class VisualEncoder(torch.nn.Module):
 
         self.backbone = S3D_backbone(CFG)
         self.head = HeadNetwork(CFG)
-        #self.weights_loader = WeightsLoader(sd = self.state_dict(), weight_filename=CFG.weights_filename)
         
         try:
             print("Loading entire state dict directly...")
-            checkpoint = torch.load(CFG.weights_filename)['model_state_dict']
+            checkpoint = torch.load(CFG.checkpoint_path)['model_state_dict']
             self.load_state_dict(checkpoint)
             print("Succesfully loaded")
         
@@ -30,22 +29,6 @@ class VisualEncoder(torch.nn.Module):
                 self.head.weightsLoader.load(CFG.verbose)
             else:
                 print("Training head network from scratch")
-        
-        #self.ctc_loss = torch.nn.CTCLoss(blank=0, reduction='sum', zero_infinity=True)
-    """
-    def compute_loss(self, log_probs, ipt_lens, trg, trg_lens):
-        # N, T, K --> T, N, K 
-        loss = self.ctc_loss(log_probs.permute(1,0,2),
-                             trg,
-                             ipt_lens,
-                             trg_lens)
-        return loss / log_probs.size(0) # divide with batch size
-
-    def decode(self, logits, beam_size, ipt_lens):
-
-        pass
-    
-    """
     
     def forward(self, x):
         x = self.backbone(x)

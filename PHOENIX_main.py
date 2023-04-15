@@ -66,7 +66,6 @@ def main():
       batch_size=1, 
       shuffle=False, 
       num_workers=CFG.num_workers) # TODO actually use this 🤡
-
     
     ### initialize model ###
     model = VisualEncoder(CFG).to(CFG.device)
