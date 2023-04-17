@@ -9,17 +9,23 @@ class S3D_backbone(S3D):
 
         self.CFG = CFG
         self.frozen_modules = []
-        self.freeze = CFG.freeze
+        self.freeze_block = CFG.freeze_block
         self.use_block = CFG.use_block
 
         self.weightsLoader = WeightsLoader(self.state_dict(), CFG.backbone_weights_filename)
-
+        block2idx = {1 : 1,
+                     2 : 4,
+                     3 : 7,
+                     4: 13,
+                     5: 16}
         # freeze blocks 1... 5
-        if self.freeze:
-            for m in self.base:
-                for name, param in m.named_parameters():
+        if self.freeze_block > 0:
+            print(f"Freezing up to block {self.freeze_block} in S3D backbone")
+            for i in range(block2idx[self.freeze_block]):
+                #for m in self.base[i]:
+                for name, param in self.base[i].named_parameters():
                     param.requires_grad = False
-
+    
     def load_weights(self, verbose):
         print(f"Loading weights from {self.CFG.backbone_weights_filename.split('/')[0]}")
         self.weightsLoader.load(verbose=verbose)

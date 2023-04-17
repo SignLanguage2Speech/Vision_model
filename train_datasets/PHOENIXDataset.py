@@ -6,7 +6,6 @@ import torchvision
 from torch.utils import data
 import numpy as np
 import pandas as pd
-import subprocess
 from PIL import Image
 import pdb
 

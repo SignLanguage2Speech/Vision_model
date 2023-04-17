@@ -20,6 +20,14 @@ class DataPaths:
 CFG = cfg()
 dp = DataPaths()
 
+model = VisualEncoder(CFG).to(CFG.device)
+
+for name, param in model.backbone.base.named_parameters():
+  #print("Name", name)
+  if param.requires_grad == False:
+    print(f"NAME: {name}")
+
+"""
 ### initialize data ###
 train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
 val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
@@ -52,3 +60,5 @@ optimizer, criterion, scheduler, \
 
 ### validate the model ###
 validate(model, dataloader_val, criterion, decoder, CFG)
+
+"""

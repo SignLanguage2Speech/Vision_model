@@ -14,14 +14,14 @@ class HeadNetwork(nn.Module):
         self.relu1 = nn.ReLU()
 
         self.PE = PositionalEncoding(d_model=CFG.hidden_size, N=10000)
-        self.dropout1 = nn.Dropout(0.1)
+        self.dropout1 = nn.Dropout(CFG.head_dropout)
         
         self.temp_conv_block = nn.Sequential(
                                 nn.Conv1d(CFG.hidden_size, CFG.ff_size, kernel_size=CFG.ff_kernel_size, stride=1, padding='same'),
                                 nn.ReLU(),
-                                nn.Dropout(p=0.1),
+                                nn.Dropout(p=CFG.head_dropout),
                                 nn.Conv1d(CFG.ff_size, CFG.hidden_size, kernel_size=CFG.ff_kernel_size, stride=1, padding='same'),
-                                nn.Dropout(p=0.1))
+                                nn.Dropout(p=CFG.head_dropout))
 
         
         self.layer_norm2 = nn.LayerNorm(CFG.hidden_size, eps=1e-06)

@@ -47,12 +47,12 @@ def get_train_modules(model, dataloader_train, CFG):
         nbest=1, # number of hypotheses to return
         beam_size = 100,       # n.o competing hypotheses at each step
         beam_size_token=25,  # top_n tokens to consider at each step
+        beam_threshold = 100 # prune everything below value relative to best score at each step
     )
     criterion = torch.nn.CTCLoss(
         blank=0, 
         zero_infinity=True, 
-        reduction='mean'
-    ).to(CFG.device)
+        reduction='mean').to(CFG.device)
 
     ### send model to device ###
     model.to(CFG.device)

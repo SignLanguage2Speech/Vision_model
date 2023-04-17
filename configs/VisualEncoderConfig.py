@@ -9,17 +9,18 @@ class cfg:
         self.VOCAB_SIZE = self.n_classes - 1
         # S3D backbone
         self.use_block = 4 # use everything except lass block
-        self.freeze = False
+        self.freeze_block = 1 # [0, ...5] 
         # Head network
         self.ff_size = 2048
         self.input_size = 832
         self.hidden_size = 512
         self.ff_kernel_size = 3
         self.residual_connection = True
+        self.head_dropout = 0.15 # 0.10 in SOTA config
         # training
         self.betas = (0.9, 0.998)
         self.weight_decay = 1e-3
-        self.lr = 1e-3
+        self.lr = 1.0e-3
         self.batch_size = 4
         self.n_epochs = 80
         self.num_workers = 8
@@ -27,7 +28,7 @@ class cfg:
         self.val_print_freq = 200
         # verbose for weightloading #
         self.verbose = False
-        self.start_epoch = 19
+        self.start_epoch = 0
         ### paths ###
         # self.weights_filename = '/work3/s204138/bach-models/PHOENIX_trained_no_temp_aug/S3D_PHOENIX-21_epochs-5.337249_loss_0.983955_WER'
         self.backbone_weights_filename = 'WLASL/epoch299.pth.tar'
