@@ -21,11 +21,15 @@ CFG = cfg()
 dp = DataPaths()
 
 model = VisualEncoder(CFG).to(CFG.device)
+#for name, param in model.state_dict().items():
+#  print("NAMEEe ", name)
 
-for name, param in model.backbone.base.named_parameters():
-  #print("Name", name)
+
+for name, param in model.named_parameters():
   if param.requires_grad == False:
-    print(f"NAME: {name}")
+    print("FROZENNN: ", name)
+
+
 
 """
 ### initialize data ###

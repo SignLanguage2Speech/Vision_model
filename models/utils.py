@@ -66,7 +66,34 @@ class WeightsLoader:
         
     
     def load(self, verbose=True):
-    
+        weight_type = None
+        weights = torch.load(self.weight_filename, map_location='cpu')['model_state_dict']
+
+        if "wlasl" in self.weight_filename.lower():
+            weight_type = 'WLASL'
+        elif "phoenix" in self.weight_filename.lower():
+            weight_type = 'PHOENIX'
+        print(f"Loading {weight_type} weights")
+        for name, param in weights.items():
+            #print("name: ", name)
+            # fix naming issues in kinetics state dict
+            if weight_type == 'Kinetics':
+                name = name.strip('module.') # clean for kinetics
+                name = name.replace('track', 'tracked') # clean for kinetics
+            #elif weight_type == 'WLASL':
+                
+        
+            if name in self.sd:
+                if param.size() == self.sd[name].size():
+                    self.sd[name].copy_(param)
+                else:
+                    if verbose:
+                        print(f"Dimensions do not match...\n parameter: {name} has size {param.size()}\n Original size is: {self.sd[name].size()}")
+            else:
+                if verbose:
+                    print(f"Param {name} not in state dict")
+                
+        """
         file = f'weights/{self.weight_filename}'
         weight_type = self.weight_filename.split('/')[0]
         weights = torch.load(file, map_location='cpu')['state_dict']
@@ -90,4 +117,6 @@ class WeightsLoader:
             else:
                 if verbose:
                     print(f"Param {name} not in state dict")
+        
+        """
         
