@@ -32,6 +32,8 @@ class VisualEncoder(torch.nn.Module):
         
         if CFG.freeze_block > 0:
             self.backbone.freeze()
+        else:
+            print("Everything unfrozen")
         self.set_train()
 
     def set_train(self):

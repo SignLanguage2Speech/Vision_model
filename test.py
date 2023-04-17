@@ -30,7 +30,6 @@ for name, param in model.named_parameters():
     print("FROZENNN: ", name)
 
 
-
 """
 ### initialize data ###
 train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
