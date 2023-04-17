@@ -201,7 +201,7 @@ def collator(data, data_augmentation):
   batch = torch.zeros((len(image_path_lists), 3, max_ipt_len, 224, 224))
   targets = torch.zeros((len(trgs), max_trg_len))
   
-  for i, image_paths in enumrate(image_path_lists):
+  for i, image_paths in enumerate(image_path_lists):
     vid = np.empty((len(image_paths), 260, 210, 3))
     for j,ipt in enumerate(image_paths):
         vid[j,:,:,:] = np.asarray(Image.open(ipt))

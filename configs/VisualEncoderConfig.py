@@ -27,7 +27,7 @@ class cfg:
         self.val_print_freq = 200
         # verbose for weightloading #
         self.verbose = False
-        self.start_epoch = 0
+        self.start_epoch = 19
         ### paths ###
         # self.weights_filename = '/work3/s204138/bach-models/PHOENIX_trained_no_temp_aug/S3D_PHOENIX-21_epochs-5.337249_loss_0.983955_WER'
         self.backbone_weights_filename = 'WLASL/epoch299.pth.tar'

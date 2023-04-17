@@ -54,7 +54,6 @@ def getVocab(path):
     # get vocabulary for translations and glosses for the train dataset
     glosses = list(clean_phoenix_glosses(train.iloc[i]['orth']) for i in range(len(train))) #+ list(test['orth']) + list(val['orth'])
     glosses = list(sorted(set([word for sent in glosses for word in sent.replace(chars,'').split(' ')])))
-    #print(f"Gloss vocab size: {len(glosses)}")
 
     translations = list(train['translation']) #+ list(test['translation']) + list(val['translation'])
     translations = list(sorted(set([word for sent in translations for word in sent.replace(chars,'').split(' ')])))
@@ -84,7 +83,6 @@ def groupByBin(df):
   while val < max_val:
     val = int(val*1.25)
     bins.append(val)
-# [16, 1.2*16, 1.2*1.2*16 ...]
 
   dataframes = []
   for i in range(len(bins)-1):
@@ -129,19 +127,3 @@ def clean_phoenix_glosses(prediction):
     prediction = prediction.strip()
 
     return prediction
-
-
-
-# ########## TEST ##########
-# annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
-# features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
-
-# train = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
-# val = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
-# test = pd.read_csv(os.path.join(annotations_path, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
-
-# val = preprocess_df(val, "dev")
-
-# for i in range(len(val)):
-#   if "WIE" in val.iloc[i]["orth"]:
-#     print(val.iloc[i]["orth"])

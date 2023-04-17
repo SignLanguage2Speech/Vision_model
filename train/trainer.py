@@ -63,7 +63,7 @@ def get_train_modules(model, dataloader_train, CFG):
 def train(model, dataloader_train, dataloader_val, CFG):
 
     ### printing training ###
-    print("-"*10 + "STARTING TRAINING" + "-"*10)
+    print("-"*10 + "STARTING TRAINING OF BS" + str(CFG.batch_size) + "-"*10)
     
     ### initialize training modules ###
     optimizer, criterion, scheduler, \
