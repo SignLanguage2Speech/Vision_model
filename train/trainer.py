@@ -85,7 +85,7 @@ def train(model, dataloader_train, dataloader_val, CFG):
             ref_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in refs]
 
             ### get output and calculate loss ###
-            out = model(ipt.to(CFG.device))
+            out, _ = model(ipt.to(CFG.device))
             x = out.permute(1, 0, 2)
             trg = torch.concat(refs).to(CFG.device)
             trg_len = trg_len.to(torch.int32)
@@ -159,7 +159,7 @@ def validate(model, dataloader, criterion, decoder, CFG, decode_func=None):
 
         with torch.no_grad():
             ### get model output and calculate loss ###
-            out = model(ipt.to(CFG.device))
+            out, _ = model(ipt.to(CFG.device))
             x = out.permute(1, 0, 2)  
             ipt_len = torch.full(size=(1,), fill_value = out.size(1), dtype=torch.int32)
             loss = criterion(torch.log(x), 

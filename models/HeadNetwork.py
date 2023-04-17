@@ -50,12 +50,11 @@ class HeadNetwork(nn.Module):
         x = self.dropout1(x)
         # temporal convolutional block
         if self.residual_connection:
-            x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2) + x 
+            gloss_reps = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2) + x 
         else:
-            x = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2)
-        x = self.layer_norm3(x)
-
+            gloss_reps = self.temp_conv_block(self.layer_norm2(x).transpose(1, 2)).transpose(1, 2)
+        
         # gloss translation layer
-        logits = self.translation_layer(x)
+        logits = self.translation_layer(self.layer_norm3(gloss_reps))
         gloss_probs = self.Softmax(logits)
-        return gloss_probs
+        return gloss_probs, gloss_reps
