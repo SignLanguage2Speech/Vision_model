@@ -1,6 +1,7 @@
 ##### Dataset class for Phoenix #####
 import os
-from train_datasets.preprocess_PHOENIX import preprocess_df
+# from train_datasets.preprocess_PHOENIX import preprocess_df
+from preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
 from torch.utils import data
@@ -11,18 +12,21 @@ import pdb
 
 from math import ceil
 
-def transform_rgb(video):
+def normalize(video):
   ''' stack & normalization '''
-  video = np.concatenate(video, axis=-1)
-  video = torch.from_numpy(video).permute(2, 0, 1).contiguous().float()
-  video = video.mul_(2.).sub_(255).div(255)
-  out = video.view(-1,3,video.size(1),video.size(2)).permute(1,0,2,3)
+  # video = video.sub_(255).div(255)
+  video = video.div(255)
+  return video
+
+def reshape(video):
+  out = video.permute(1,0,2,3)
   return out
 
 def revert_transform_rgb(clip):
   clip = clip.permute(1, 2, 3, 0)
   clip = clip.contiguous().view(1, -1, clip.size(1), clip.size(2)).squeeze(0)
-  clip = clip.mul_(255).add_(255).div(2)
+  # clip = clip.mul_(255).add_(255).div(2)
+  clip = clip.mul_(255)
   clip = clip.view(-1, clip.size(1), clip.size(2), 3)
   return clip.numpy()
 
@@ -35,30 +39,32 @@ class DataAugmentations:
     self.W_out = 224
     self.split_type = split_type
     self._center_crop = torchvision.transforms.CenterCrop((self.H_out, self.W_out))
+    self._center_crop_pre_random = torchvision.transforms.CenterCrop((240, 240))
     self._random_crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
     self._random_rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0.0, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR)
     self._upsample_pixels = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
 
   def __call__(self, vid):
-    # pdb.set_trace()
     if self.split_type == 'train':
       vid = self.UpsamplePixels(vid)
-      vid = transform_rgb(vid) # convert to tensor, reshape and normalize
+      vid = normalize(vid)
+      vid = reshape(vid)
       vid = self.HorizontalFlip(vid)
-      vid = self.RandomCrop(vid)
       vid = self.RandomRotation(vid)
+      vid = self.RandomCrop(vid)
       
     else:
       # apply validation augmentations
       vid = self.UpsamplePixels(vid)
-      vid = transform_rgb(vid)
+      vid = normalize(vid)
+      vid = reshape(vid)
       vid = self.CenterCrop(vid)
       
     return vid
   
   def UpsamplePixels(self, imgs: np.ndarray):
-    imgs = self._upsample_pixels(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
-    return imgs.permute(0, 2, 3, 1).numpy() # return and revert dim changes
+    return self._upsample_pixels(torch.from_numpy(imgs).double().permute(0, 3, 1, 2).contiguous()) # upsample and place color channel as dim 1
+    # return imgs.permute(0, 2, 3, 1) # return and revert dim changes
 
   # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
@@ -69,7 +75,7 @@ class DataAugmentations:
   
   # random 224 x 224 crop (same crop for all images in video)
   def RandomCrop(self, imgs):
-    return self._random_crop(imgs)
+    return self._random_crop(self._center_crop_pre_random(imgs))
   
   # 224 x 224 center crop (all images in video)
   def CenterCrop(self, imgs):
@@ -237,83 +243,86 @@ def collator(data, data_augmentation):
 
 
 
-# from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader
 
-# class DataPaths:
-#   def __init__(self):
-#     self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
-#     self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
+class DataPaths:
+  def __init__(self):
+    self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
+    self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 
-# dp = DataPaths()
-# test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')[:2]
-# train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:2]
-# PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
-# PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=1085, split='train')
+dp = DataPaths()
+test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')[:4]
+train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:4]
+PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
+PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=1085, split='train')
 
 
-# test_augmentations = DataAugmentations(split_type='val')
-# dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
-#                                    shuffle=False,
-#                                    num_workers=0,
-#                                    collate_fn=lambda data: collator(data, test_augmentations)
-#                                    )
+test_augmentations = DataAugmentations(split_type='val')
+dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
+                                   shuffle=False,
+                                   num_workers=0,
+                                   collate_fn=lambda data: collator(data, test_augmentations)
+                                   )
 
-# train_augmentations = DataAugmentations(split_type='train')
-# dataloaderTrain = DataLoader(PhoenixTrain, batch_size=1, 
-#                                    shuffle=False,
-#                                    num_workers=0,
-#                                    collate_fn=lambda data: collator(data, train_augmentations)
-#                                    )
+train_augmentations = DataAugmentations(split_type='train')
+dataloaderTrain = DataLoader(PhoenixTrain, batch_size=4, 
+                                   shuffle=True,
+                                   num_workers=0,
+                                   collate_fn=lambda data: collator(data, train_augmentations)
+                                   )
                               
-# if __name__ == '__main__':
-#   import cv2
+if __name__ == '__main__':
+  import cv2
 
-#   for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
-#     # pdb.set_trace()
-#     ipt_np = revert_transform_rgb(ipt[0])
-#     w = h = 224
-#     c = 3
-#     fps = 25
-#     sec = 10
+  for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
+    # pdb.set_trace()
+    ipt_np = revert_transform_rgb(ipt[0])
+    w = h = 224
+    c = 3
+    fps = 25
+    sec = 10
     
-#     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-#     # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-#     video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
-#     for frame_count in range(len(ipt_np)):
-#       # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-#       img = ipt_np[frame_count].astype(np.uint8)
-#       # pdb.set_trace()
-#       video.write(img)
-#     video.release()
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
+    for frame_count in range(len(ipt_np)):
+      # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+      img = ipt_np[frame_count].astype(np.uint8)
+      # pdb.set_trace()
+      video.write(img)
+    video.release()
 
-#     print("IPTT", ipt.size())
-#     print(ipt_len)
-#     print("TRGG", trg.size())
-#     print(trg_len)
-#     break
+    print("IPTT", ipt.size())
+    print(ipt_len)
+    print("TRGG", trg.size())
+    print(trg_len)
+    break
 
-#   for (ipt, ipt_len, trg, trg_len) in dataloaderTrain:
-#     # pdb.set_trace()
-#     ipt_np = revert_transform_rgb(ipt[0])
-#     w = h = 224
-#     c = 3
-#     fps = 25
-#     sec = 10
-    
-#     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-#     # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-#     video = cv2.VideoWriter('train.mp4', fourcc, float(fps), (w, h))
-#     for frame_count in range(len(ipt_np)):
-#       # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-#       img = ipt_np[frame_count].astype(np.uint8)
-#       # pdb.set_trace()
-#       video.write(img)
-#     video.release()
+  for (ipt, ipt_len, trg, trg_len) in dataloaderTrain:
+    # pdb.set_trace()
 
-#     print("IPTT", ipt.size())
-#     print(ipt_len)
-#     print("TRGG", trg.size())
-#     print(trg_len)
-#     break
+    for i in range(4):
+      print(f"INPUT SIZE BATCH {ipt.shape}")
+      ipt_np = revert_transform_rgb(ipt[i])
+      w = h = 224
+      c = 3
+      fps = 25
+      sec = 10
+      
+      fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+      # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+      video = cv2.VideoWriter(f'train{i}.mp4', fourcc, float(fps), (w, h))
+      for frame_count in range(len(ipt_np)):
+        # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+        img = ipt_np[frame_count].astype(np.uint8)
+        # pdb.set_trace()
+        video.write(img)
+      video.release()
 
+      print("IPTT", ipt.size())
+      print(ipt_len)
+      print("TRGG", trg.size())
+      print(trg_len)
+
+    break 
 
