@@ -43,18 +43,21 @@ class DataAugmentations:
     self._random_crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
     self._random_rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0.0, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR)
     self._upsample_pixels = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
+    self._color_jitter = torchvision.transforms.ColorJitter(0.4,0.4,0.4,0.1)
+    self._to_PIL = torchvision.transforms.ToPILImage()
+    self._to_tensor = torchvision.transforms.ToTensor()
 
   def __call__(self, vid):
     if self.split_type == 'train':
       vid = self.UpsamplePixels(vid)
       vid = normalize(vid)
+      vid = self.ColorJitter(vid)
       vid = reshape(vid)
       vid = self.HorizontalFlip(vid)
       vid = self.RandomRotation(vid)
       vid = self.RandomCrop(vid)
       
     else:
-      # apply validation augmentations
       vid = self.UpsamplePixels(vid)
       vid = normalize(vid)
       vid = reshape(vid)
@@ -84,6 +87,9 @@ class DataAugmentations:
   # randomly rotate all images in video with +- 5 degrees.
   def RandomRotation(self, imgs):
     return self._random_rotate(imgs)
+
+  def ColorJitter(self, imgs):
+    return self._color_jitter(imgs)
 
 def upsample(images, seq_len):
   images_org = images.detach().clone() # create a clone of original input
