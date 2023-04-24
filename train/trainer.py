@@ -52,7 +52,7 @@ def get_train_modules(model, dataloader_train, CFG):
     criterion = torch.nn.CTCLoss(
         blank=0, 
         zero_infinity=True, 
-        reduction='mean').to(CFG.device)
+        reduction='sum').to(CFG.device)
 
     ### send model to device ###
     model.to(CFG.device)
@@ -95,7 +95,7 @@ def train(model, dataloader_train, dataloader_val, CFG):
                 loss = criterion(torch.log(x), 
                                 trg,
                                 input_lengths=ipt_len,
-                                target_lengths=trg_len)
+                                target_lengths=trg_len) / out.size(0)
             
             ### backprop and steps ###
             optimizer.zero_grad()
@@ -165,7 +165,7 @@ def validate(model, dataloader, criterion, decoder, CFG, decode_func=None):
             loss = criterion(torch.log(x), 
                               trg, 
                               input_lengths=ipt_len,
-                              target_lengths=trg_len)
+                              target_lengths=trg_len) / out.size(0)
             
             ### save loss and get preds ###
             try:
@@ -175,7 +175,7 @@ def validate(model, dataloader, criterion, decoder, CFG, decode_func=None):
                 pred_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in preds]
                 ref_sents = tokens_to_sent(CFG.gloss_vocab, trg[0][:trg_len[0]])
                 word_error_rates.append(word_error_rate(pred_sents, ref_sents).item())
-                secondary_word_error_rates.append(wer_list(ref_sents,pred_sents))
+                secondary_word_error_rates.append(wer_list([ref_sents], pred_sents))
             except IndexError:
                 print(f"The output of the decoder:\n{out_d}\n caused an IndexError!")
 

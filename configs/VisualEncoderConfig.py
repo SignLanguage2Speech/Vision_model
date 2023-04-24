@@ -19,12 +19,12 @@ class cfg:
         self.head_dropout = 0.2 # 0.10 in SOTA config
         # training
         self.betas = (0.9, 0.998)
-        self.weight_decay = 1e-3
+        self.weight_decay = 1.0e-3
         self.lr = 1.0e-3
         self.batch_size = 6
-        self.n_epochs = 50
+        self.n_epochs = 80
         self.num_workers = 8
-        self.train_print_freq = 1500
+        self.train_print_freq = 500
         self.val_print_freq = 200
         # verbose for weightloading #
         self.verbose = False
@@ -33,7 +33,7 @@ class cfg:
         # self.weights_filename = '/work3/s204138/bach-models/PHOENIX_trained_no_temp_aug/S3D_PHOENIX-21_epochs-5.337249_loss_0.983955_WER'
         self.backbone_weights_filename = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc' #'WLASL/epoch299.pth.tar'
         self.head_weights_filename = None
-        self.save_path = '/work3/s204138/bach-models/PHOENIX_bs6_dropout02'
+        self.save_path = '/work3/s204138/bach-models/PHOENIX_bs6_dropout01'
         self.default_checkpoint = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc'
         self.checkpoint_path = None #'/work3/s200925/VisualEncoder/checkpoints_BS4/S3D_PHOENIX-19_epochs-1.479696_loss_0.310143_WER' # None  # if None train from scratch
         self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')

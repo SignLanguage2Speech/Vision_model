@@ -37,7 +37,8 @@ class VisualEncoder(torch.nn.Module):
         self.set_train()
 
     def set_train(self):
-        block2idx = {1 : 1,
+        block2idx = {0 : 0,
+                     1 : 1,
                      2 : 4,
                      3 : 7,
                      4: 13,

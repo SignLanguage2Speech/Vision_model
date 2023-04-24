@@ -47,7 +47,7 @@ def main():
 
     ### get dataloaders ###
     train_augmentations = DataAugmentations(split_type='train')
-    val_augmentations = DataAugmentations(split_type='val')
+    val_augmentations = DataAugmentations(split_type='dev')
     dataloader_train = DataLoader(
       PhoenixTrain, 
       collate_fn = lambda data: collator(data, train_augmentations), 
