@@ -26,7 +26,7 @@ PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split=
 #print(list(z))
 
 train_augmentations = DataAugmentations(split_type='train')
-dataloaderTest = DataLoader(PhoenixTest, batch_size=2, 
+dataloaderTest = DataLoader(PhoenixTest, batch_size=4, 
                                    shuffle=False,
                                    num_workers=0,
                                    collate_fn=lambda data: collator(data, train_augmentations)
@@ -35,22 +35,23 @@ if __name__ == '__main__':
   import cv2
 
   for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
-    # pdb.set_trace()
-    ipt_np = revert_transform_rgb(ipt[1])
-    w = h = 224
-    c = 3
-    fps = 25
-    sec = 10
-    
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-    video = cv2.VideoWriter('test_TRAIN.mp4', fourcc, float(fps), (w, h))
-    for frame_count in range(len(ipt_np)):
-      # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-      img = ipt_np[frame_count].astype(np.uint8)
+    for i, vid in enumerate(ipt):
       # pdb.set_trace()
-      video.write(img)
-    video.release()
+      ipt_np = revert_transform_rgb(vid)
+      w = h = 224
+      c = 3
+      fps = 25
+      sec = 10
+      
+      fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+      # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+      video = cv2.VideoWriter(f'train_sample{i}.mp4', fourcc, float(fps), (w, h))
+      for frame_count in range(len(ipt_np)):
+        # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+        img = ipt_np[frame_count].astype(np.uint8)
+        # pdb.set_trace()
+        video.write(img)
+      video.release()
 
     print("IPTT", ipt.size())
     print(ipt_len)

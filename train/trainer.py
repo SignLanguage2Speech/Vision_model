@@ -17,11 +17,17 @@ from utils.secondary_word_error_rate import wer_list
 def get_train_modules(model, dataloader_train, CFG):
 
     ### get optimizer and scheduler ###
-    optimizer = optim.AdamW(
+    #optimizer = optim.AdamW(
+    #    model.parameters(),
+    #    lr = CFG.lr,
+    #    betas = CFG.betas,
+    #    weight_decay = CFG.weight_decay)
+    optimizer = optim.Adam(
         model.parameters(),
         lr = CFG.lr,
         betas = CFG.betas,
         weight_decay = CFG.weight_decay)
+
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, 
         T_max = CFG.n_epochs)
@@ -46,7 +52,7 @@ def get_train_modules(model, dataloader_train, CFG):
         tokens= ['-'] + [str(i+1) for i in range(CFG.VOCAB_SIZE)] + ['|'], # vocab + blank and split
         nbest=1, # number of hypotheses to return
         beam_size = 100,       # n.o competing hypotheses at each step
-        beam_size_token=25,  # top_n tokens to consider at each step
+        beam_size_token=50,  # top_n tokens to consider at each step
         beam_threshold = 100 # prune everything below value relative to best score at each step
     )
     criterion = torch.nn.CTCLoss(
@@ -78,24 +84,24 @@ def train(model, dataloader_train, dataloader_val, CFG):
         model.train()
         start = time.time()
         word_error_rates = []
-
+        
         ### iterate through each batch in dataloader ###
-        for itt, (ipt, _, trg, trg_len) in enumerate(dataloader_train):
+        for itt, (ipt, vid_lens, trg, trg_len) in enumerate(dataloader_train):
             refs = [t[:trg_len[i]].cpu() for i, t in enumerate(trg)]
             ref_sents = [tokens_to_sent(CFG.gloss_vocab, s) for s in refs]
 
             ### get output and calculate loss ###
-            out, _ = model(ipt.to(CFG.device))
+            out, _ = model(ipt.to(CFG.device), vid_lens)
             x = out.permute(1, 0, 2)
             trg = torch.concat(refs).to(CFG.device)
             trg_len = trg_len.to(torch.int32)
             ipt_len = torch.full(size=(out.size(0),), fill_value = out.size(1), dtype=torch.int32)
             
-            with torch.backends.cudnn.flags(enabled=False):
-                loss = criterion(torch.log(x), 
-                                trg,
-                                input_lengths=ipt_len,
-                                target_lengths=trg_len) / out.size(0)
+            #with torch.backends.cudnn.flags(enabled=False):
+            loss = criterion(torch.log(x), 
+                            trg,
+                            input_lengths=ipt_len,
+                            target_lengths=trg_len) / out.size(0)
             
             ### backprop and steps ###
             optimizer.zero_grad()
@@ -131,6 +137,7 @@ def train(model, dataloader_train, dataloader_val, CFG):
         train_losses.append(losses)
         train_word_error_rates.append(word_error_rates)
 
+        
         ### run validation loop ###
         val_loss, val_word_error_rate = validate(model, dataloader_val, criterion, decoder, CFG)
         val_losses.append(val_loss)
@@ -141,8 +148,8 @@ def train(model, dataloader_train, dataloader_val, CFG):
         save_checkpoint(fname, model, optimizer, scheduler, epoch+1, train_losses, val_losses, train_word_error_rates, val_word_error_rates)
 
         ### stepping with scheduler ###
-        scheduler.step()
-
+        scheduler.step() # TODO: UNCOMMENT!!!!!!!
+        
 
 
 def validate(model, dataloader, criterion, decoder, CFG, decode_func=None):
@@ -155,11 +162,11 @@ def validate(model, dataloader, criterion, decoder, CFG, decode_func=None):
     secondary_word_error_rates = []
 
     ### iterature through dataloader ###
-    for i, (ipt, _, trg, trg_len) in enumerate(dataloader):
+    for i, (ipt, vid_lens, trg, trg_len) in enumerate(dataloader):
 
         with torch.no_grad():
             ### get model output and calculate loss ###
-            out, _ = model(ipt.to(CFG.device))
+            out, _ = model(ipt.to(CFG.device), vid_lens)
             x = out.permute(1, 0, 2)  
             ipt_len = torch.full(size=(1,), fill_value = out.size(1), dtype=torch.int32)
             loss = criterion(torch.log(x), 

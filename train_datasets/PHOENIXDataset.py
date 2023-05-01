@@ -3,12 +3,15 @@ import os
 from train_datasets.preprocess_PHOENIX import preprocess_df
 import torch
 import torchvision
+import torchvision.transforms.functional as F
 from torch.utils import data
 import numpy as np
 import pandas as pd
 from PIL import Image
 import pdb
 from math import ceil
+import random, numbers
+from typing import Optional, List, Union, Tuple
 
 def normalize(video):
   ''' stack & normalization '''
@@ -28,6 +31,123 @@ def revert_transform_rgb(clip):
   clip = clip.view(-1, clip.size(1), clip.size(2), 3)
   return clip.numpy()
 
+
+class ColorJitter(torch.nn.Module):
+    """
+    Original code taken from torchvision:
+    https://pytorch.org/vision/main/_modules/torchvision/transforms/transforms.html#ColorJitter.forward
+
+    Randomly change the brightness, contrast, saturation and hue of an image.
+    Args:
+        brightness (float or tuple of float (min, max)): How much to jitter brightness.
+            brightness_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
+            or the given [min, max]. Should be non negative numbers.
+        contrast (float or tuple of float (min, max)): How much to jitter contrast.
+            contrast_factor is chosen uniformly from [max(0, 1 - contrast), 1 + contrast]
+            or the given [min, max]. Should be non-negative numbers.
+        saturation (float or tuple of float (min, max)): How much to jitter saturation.
+            saturation_factor is chosen uniformly from [max(0, 1 - saturation), 1 + saturation]
+            or the given [min, max]. Should be non negative numbers.
+        hue (float or tuple of float (min, max)): How much to jitter hue.
+            hue_factor is chosen uniformly from [-hue, hue] or the given [min, max].
+            Should have 0<= hue <= 0.5 or -0.5 <= min <= max <= 0.5.
+            To jitter hue, the pixel values of the input image has to be non-negative for conversion to HSV space;
+            thus it does not work if you normalize your image to an interval with negative values,
+            or use an interpolation that generates negative values before using this function.
+    """
+
+    def __init__(
+        self,
+        brightness: Union[float, Tuple[float, float]] = 0,
+        contrast: Union[float, Tuple[float, float]] = 0,
+        saturation: Union[float, Tuple[float, float]] = 0,
+        hue: Union[float, Tuple[float, float]] = 0) -> None:
+        super().__init__()
+        
+        self.brightness = self._check_input(brightness, "brightness")
+        self.contrast = self._check_input(contrast, "contrast")
+        self.saturation = self._check_input(saturation, "saturation")
+        self.hue = self._check_input(hue, "hue", center=0, bound=(-0.5, 0.5), clip_first_on_zero=False)
+
+    @torch.jit.unused
+    def _check_input(self, value, name, center=1, bound=(0, float("inf")), clip_first_on_zero=True):
+        if isinstance(value, numbers.Number):
+            if value < 0:
+                raise ValueError(f"If {name} is a single number, it must be non negative.")
+            value = [center - float(value), center + float(value)]
+            if clip_first_on_zero:
+                value[0] = max(value[0], 0.0)
+        elif isinstance(value, (tuple, list)) and len(value) == 2:
+            value = [float(value[0]), float(value[1])]
+        else:
+            raise TypeError(f"{name} should be a single number or a list/tuple with length 2.")
+
+        if not bound[0] <= value[0] <= value[1] <= bound[1]:
+            raise ValueError(f"{name} values should be between {bound}, but got {value}.")
+
+        # if value is 0 or (1., 1.) for brightness/contrast/saturation
+        # or (0., 0.) for hue, do nothing
+        if value[0] == value[1] == center:
+            return None
+        else:
+            return tuple(value)
+
+    @staticmethod
+    def get_params(
+        brightness: Optional[List[float]],
+        contrast: Optional[List[float]],
+        saturation: Optional[List[float]],
+        hue: Optional[List[float]]) -> Tuple[torch.Tensor, Optional[float], Optional[float], Optional[float], Optional[float]]:
+        """Get the parameters for the randomized transform to be applied on image.
+        Args:
+            brightness (tuple of float (min, max), optional): The range from which the brightness_factor is chosen
+                uniformly. Pass None to turn off the transformation.
+            contrast (tuple of float (min, max), optional): The range from which the contrast_factor is chosen
+                uniformly. Pass None to turn off the transformation.
+            saturation (tuple of float (min, max), optional): The range from which the saturation_factor is chosen
+                uniformly. Pass None to turn off the transformation.
+            hue (tuple of float (min, max), optional): The range from which the hue_factor is chosen uniformly.
+                Pass None to turn off the transformation.
+
+        Returns:
+            tuple: The parameters used to apply the randomized transform
+            along with their random order.
+        """
+
+        fn_idx = torch.randperm(4)
+
+        b = None if brightness is None else float(torch.empty(1).uniform_(brightness[0], brightness[1]))
+        c = None if contrast is None else float(torch.empty(1).uniform_(contrast[0], contrast[1]))
+        s = None if saturation is None else float(torch.empty(1).uniform_(saturation[0], saturation[1]))
+        h = None if hue is None else float(torch.empty(1).uniform_(hue[0], hue[1]))
+
+        return fn_idx, b, c, s, h
+
+
+    def forward(self, imgs):
+      
+      T, C, H, W = imgs.shape
+
+      fn_idx, brightness_factor, contrast_factor, saturation_factor, hue_factor = self.get_params(
+          self.brightness, self.contrast, self.saturation, self.hue)
+      result = torch.empty(T, C, H, W)
+      for i, img in enumerate(imgs):
+        for fn_id in fn_idx:
+            if fn_id == 0 and brightness_factor is not None:
+                img = F.adjust_brightness(img, brightness_factor)
+            elif fn_id == 1 and contrast_factor is not None:
+                img = F.adjust_contrast(img, contrast_factor)
+            elif fn_id == 2 and saturation_factor is not None:
+                img = F.adjust_saturation(img, saturation_factor)
+            elif fn_id == 3 and hue_factor is not None:
+                img = F.adjust_hue(img, hue_factor)
+        result[i] = img
+        #result.append(img)
+      
+      #result = torch.concat(result, dim=0).view(-1, C, H, W)      
+      return result
+
+
 ############# Data augmentations #############
 class DataAugmentations:
   def __init__(self, split_type=None):
@@ -41,7 +161,7 @@ class DataAugmentations:
     self._random_crop = torchvision.transforms.RandomCrop((self.H_out, self.W_out), padding = 0, padding_mode='constant')
     self._random_rotate = torchvision.transforms.RandomRotation(5, expand=False, fill=0.0, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR)
     self._upsample_pixels = torch.nn.Upsample(size=(self.H_upsample, self.W_upsample), scale_factor=None, mode='bilinear', align_corners=None, recompute_scale_factor=None)
-    self._color_jitter = torchvision.transforms.ColorJitter(0.4,0.4,0.4,0.1)
+    self._color_jitter = ColorJitter(0.4, 0.4, 0.4, 0.1)
     self._to_PIL = torchvision.transforms.ToPILImage()
     self._to_tensor = torchvision.transforms.ToTensor()
 
@@ -51,7 +171,8 @@ class DataAugmentations:
       vid = normalize(vid)
       vid = self.ColorJitter(vid)
       vid = reshape(vid)
-      vid = self.HorizontalFlip(vid)
+      vid = self._center_crop_pre_random(vid)
+      #vid = self.HorizontalFlip(vid)
       vid = self.RandomRotation(vid)
       vid = self.RandomCrop(vid)
       
@@ -69,8 +190,7 @@ class DataAugmentations:
 
   # flip all images in video horizontally with 50% probability
   def HorizontalFlip(self, imgs):
-    p = np.random.randint(0, 2)
-    if p < 1:
+    if random.random() <= 0.5:
       imgs = torchvision.transforms.functional.hflip(imgs)
     return imgs
   
@@ -87,8 +207,9 @@ class DataAugmentations:
     return self._random_rotate(imgs)
 
   def ColorJitter(self, imgs):
-    return self._color_jitter(imgs)
-
+    if random.random() < 0.3:
+      imgs = self._color_jitter(imgs)
+    return imgs
 def upsample(images, seq_len):
   images_org = images.detach().clone() # create a clone of original input
   if seq_len / images.size(1) >= 2: # check if image needs to be duplicated
@@ -222,93 +343,91 @@ def collator(data, data_augmentation):
     trg_pad = torch.nn.ConstantPad1d((0, max_trg_len - len(trgs[i])), value=0)
     targets[i] = trg_pad(trgs[i])
   
-  return batch, torch.tensor(vid_lens, dtype=torch.int32), targets, torch.tensor(trg_lens, dtype=torch.int32)
+  return batch, torch.tensor(vid_lens, dtype=torch.long), targets, torch.tensor(trg_lens, dtype=torch.int32)
 
 
 
+"""
+from torch.utils.data import DataLoader
+
+class DataPaths:
+  def __init__(self):
+    self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
+    self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
+
+dp = DataPaths()
+test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')[:4]
+train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:4]
+PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
+PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=1085, split='train')
 
 
+test_augmentations = DataAugmentations(split_type='val')
+dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
+                                   shuffle=False,
+                                   num_workers=0,
+                                   collate_fn=lambda data: collator(data, test_augmentations)
+                                   )
 
-# from torch.utils.data import DataLoader
-
-# class DataPaths:
-#   def __init__(self):
-#     self.phoenix_videos = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
-#     self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
-
-# dp = DataPaths()
-# test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')[:4]
-# train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:4]
-# PhoenixTest = PhoenixDataset(test_df, dp.phoenix_videos, vocab_size=1085, split='test')
-# PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=1085, split='train')
-
-
-# test_augmentations = DataAugmentations(split_type='val')
-# dataloaderTest = DataLoader(PhoenixTest, batch_size=1, 
-#                                    shuffle=False,
-#                                    num_workers=0,
-#                                    collate_fn=lambda data: collator(data, test_augmentations)
-#                                    )
-
-# train_augmentations = DataAugmentations(split_type='train')
-# dataloaderTrain = DataLoader(PhoenixTrain, batch_size=4, 
-#                                    shuffle=True,
-#                                    num_workers=0,
-#                                    collate_fn=lambda data: collator(data, train_augmentations)
-#                                    )
+train_augmentations = DataAugmentations(split_type='train')
+dataloaderTrain = DataLoader(PhoenixTrain, batch_size=4, 
+                                   shuffle=True,
+                                   num_workers=0,
+                                   collate_fn=lambda data: collator(data, train_augmentations)
+                                   )
                               
-# if __name__ == '__main__':
-#   import cv2
+if __name__ == '__main__':
+  import cv2
 
-#   for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
-#     # pdb.set_trace()
-#     ipt_np = revert_transform_rgb(ipt[0])
-#     w = h = 224
-#     c = 3
-#     fps = 25
-#     sec = 10
+  for (ipt, ipt_len, trg, trg_len) in dataloaderTest:
+    # pdb.set_trace()
+    ipt_np = revert_transform_rgb(ipt[0])
+    w = h = 224
+    c = 3
+    fps = 25
+    sec = 10
     
-#     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-#     # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-#     video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
-#     for frame_count in range(len(ipt_np)):
-#       # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-#       img = ipt_np[frame_count].astype(np.uint8)
-#       # pdb.set_trace()
-#       video.write(img)
-#     video.release()
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    video = cv2.VideoWriter('test.mp4', fourcc, float(fps), (w, h))
+    for frame_count in range(len(ipt_np)):
+      # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+      img = ipt_np[frame_count].astype(np.uint8)
+      # pdb.set_trace()
+      video.write(img)
+    video.release()
 
-#     print("IPTT", ipt.size())
-#     print(ipt_len)
-#     print("TRGG", trg.size())
-#     print(trg_len)
-#     break
+    print("IPTT", ipt.size())
+    print(ipt_len)
+    print("TRGG", trg.size())
+    print(trg_len)
+    break
 
-#   for (ipt, ipt_len, trg, trg_len) in dataloaderTrain:
-#     # pdb.set_trace()
+  for (ipt, ipt_len, trg, trg_len) in dataloaderTrain:
+    # pdb.set_trace()
 
-#     for i in range(4):
-#       print(f"INPUT SIZE BATCH {ipt.shape}")
-#       ipt_np = revert_transform_rgb(ipt[i])
-#       w = h = 224
-#       c = 3
-#       fps = 25
-#       sec = 10
+    for i in range(4):
+      print(f"INPUT SIZE BATCH {ipt.shape}")
+      ipt_np = revert_transform_rgb(ipt[i])
+      w = h = 224
+      c = 3
+      fps = 25
+      sec = 10
       
-#       fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-#       # fourcc = cv2.VideoWriter_fourcc(*"avc1")
-#       video = cv2.VideoWriter(f'train{i}.mp4', fourcc, float(fps), (w, h))
-#       for frame_count in range(len(ipt_np)):
-#         # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
-#         img = ipt_np[frame_count].astype(np.uint8)
-#         # pdb.set_trace()
-#         video.write(img)
-#       video.release()
+      fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+      # fourcc = cv2.VideoWriter_fourcc(*"avc1")
+      video = cv2.VideoWriter(f'train{i}.mp4', fourcc, float(fps), (w, h))
+      for frame_count in range(len(ipt_np)):
+        # img_ = np.random.randint(0,255, (h,w,c), dtype = np.uint8)
+        img = ipt_np[frame_count].astype(np.uint8)
+        # pdb.set_trace()
+        video.write(img)
+      video.release()
 
-#       print("IPTT", ipt.size())
-#       print(ipt_len)
-#       print("TRGG", trg.size())
-#       print(trg_len)
+      print("IPTT", ipt.size())
+      print(ipt_len)
+      print("TRGG", trg.size())
+      print(trg_len)
 
-#     break 
-
+    break 
+"""

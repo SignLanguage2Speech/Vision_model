@@ -18,45 +18,6 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         return x + self.PE[:, :x.size(1), :]
-    
-"""
-class MaskedNorm(nn.Module):
-    
-        #Original Code from:
-        #https://discuss.pytorch.org/t/batchnorm-for-different-sized-samples-in-batch/44251/8
-    
-    def __init__(self, num_features=512, norm_type='sync_batch', num_groups=1):
-        super().__init__()
-        self.norm_type = norm_type
-        if self.norm_type == "batch":
-            #raise ValueError("Please use sync_batch")
-            self.norm = nn.BatchNorm1d(num_features=num_features)
-        elif self.norm_type == 'sync_batch':
-            self.norm = nn.SyncBatchNorm(num_features=num_features)
-        elif self.norm_type == "group":
-            self.norm = nn.GroupNorm(num_groups=num_groups, num_channels=num_features)
-        elif self.norm_type == "layer":
-            self.norm = nn.LayerNorm(normalized_shape=num_features)
-        else:
-            raise ValueError("Unsupported Normalization Layer")
-
-        self.num_features = num_features
-
-    def forward(self, x: torch.Tensor, mask: torch.Tensor):
-        if self.training:
-            reshaped = x.reshape([-1, self.num_features])
-            reshaped_mask = mask.reshape([-1, 1]) > 0
-            selected = torch.masked_select(reshaped, reshaped_mask).reshape(
-                [-1, self.num_features]
-            )
-            batch_normed = self.norm(selected)
-            scattered = reshaped.masked_scatter(reshaped_mask, batch_normed)
-            return scattered.reshape([x.shape[0], -1, self.num_features])
-        else:
-            reshaped = x.reshape([-1, self.num_features])
-            batched_normed = self.norm(reshaped)
-            return batched_normed.reshape([x.shape[0], -1, self.num_features])
-"""
 
 
 class WeightsLoader:
@@ -119,4 +80,43 @@ class WeightsLoader:
                     print(f"Param {name} not in state dict")
         
         """
-        
+
+
+class MaskedNorm(nn.Module):
+    """
+        Original Code from:
+        https://discuss.pytorch.org/t/batchnorm-for-different-sized-samples-in-batch/44251/8
+    """
+
+    def __init__(self, num_features=512, norm_type='batch', num_groups=1):
+        super().__init__()
+        self.norm_type = norm_type
+        if self.norm_type == "batch":
+            self.norm = nn.BatchNorm1d(num_features=num_features)
+        elif self.norm_type == 'sync_batch':
+            self.norm = nn.SyncBatchNorm(num_features=num_features)
+        elif self.norm_type == "group":
+            self.norm = nn.GroupNorm(num_groups=num_groups, num_channels=num_features)
+        elif self.norm_type == "layer":
+            self.norm = nn.LayerNorm(normalized_shape=num_features)
+        else:
+            raise ValueError("Unsupported Normalization Layer")
+
+        self.num_features = num_features
+
+    def forward(self, x: torch.Tensor, mask: torch.Tensor):
+        if self.training:
+            #print("TRAINING")
+            reshaped = x.reshape([-1, self.num_features])
+            reshaped_mask = mask.reshape([-1, 1]) > 0
+            selected = torch.masked_select(reshaped, reshaped_mask).reshape(
+                [-1, self.num_features]
+            )
+            #print("SELECTED: ", selected.size(), selected)
+            batch_normed = self.norm(selected)
+            scattered = reshaped.masked_scatter(reshaped_mask, batch_normed)
+            return scattered.reshape([x.shape[0], -1, self.num_features])
+        else:
+            reshaped = x.reshape([-1, self.num_features])
+            batched_normed = self.norm(reshaped)
+            return batched_normed.reshape([x.shape[0], -1, self.num_features])

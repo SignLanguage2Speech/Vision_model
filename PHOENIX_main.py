@@ -29,11 +29,10 @@ class DataPaths:
     self.phoenix_labels = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 
 def main():
-
     ### initialize configs and device ###
     dp = DataPaths()
     CFG = visual_encoder_cfg()
-    torch.backends.cudnn.deterministic = True
+    #torch.backends.cudnn.deterministic = True
     
     ### initialize data ###
     train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
@@ -47,12 +46,12 @@ def main():
 
     ### get dataloaders ###
     train_augmentations = DataAugmentations(split_type='train')
-    val_augmentations = DataAugmentations(split_type='dev')
+    val_augmentations = DataAugmentations(split_type='val')
     dataloader_train = DataLoader(
       PhoenixTrain, 
       collate_fn = lambda data: collator(data, train_augmentations), 
       batch_size=CFG.batch_size, 
-      shuffle=True, num_workers=CFG.num_workers)
+      shuffle=True, num_workers=CFG.num_workers) ######### REMEMBER SHUFFLE=TRUE!!!!!!
     dataloader_val = DataLoader(
       PhoenixVal, 
       collate_fn = lambda data: collator(data, val_augmentations), 
