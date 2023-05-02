@@ -20,17 +20,11 @@ class DataPaths:
 CFG = cfg()
 dp = DataPaths()
 
-model = VisualEncoder(CFG).to(CFG.device)
-#for name, param in model.state_dict().items():
-#  print("NAMEEe ", name)
 
 
-for name, param in model.named_parameters():
-  if param.requires_grad == False:
-    print("FROZENNN: ", name)
 
 
-"""
+
 ### initialize data ###
 train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
 val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
@@ -63,5 +57,3 @@ optimizer, criterion, scheduler, \
 
 ### validate the model ###
 validate(model, dataloader_val, criterion, decoder, CFG)
-
-"""

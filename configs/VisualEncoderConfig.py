@@ -2,8 +2,6 @@ import os
 from train_datasets.preprocess_PHOENIX import getVocab
 import torch
 
-
-
 """
 ###### ORIGINAL AUTHORS S2G CFG ######
 
@@ -68,9 +66,22 @@ model:
  
  ######## ABOVE DID NOT WORK... CANNOT OVERFIT ON FEW SAMPLES --> BC OF MASKING
  Running again without masking and dropout 0.10, otherwise unchanged
+
+
+ ####### Kinetics training Config!
+
+  - Dropout = 0.10
+  - Everything unfrozen
+  - AdamW optimizer
+  - torch.backends.cudnn.deterministic = True
+  - 100 epochs, T_max = 100
+  - Without Hflip
+  - Starting with kinetics
+  - residual_connection = True
 """
 
 ### Config for training on Phoenix
+gloss_vocab, translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')
 class cfg:
     def __init__(self) -> None:
         self.n_classes = 1085 + 1 # +1 for blank token
@@ -95,16 +106,16 @@ class cfg:
         self.train_print_freq = 500
         self.val_print_freq = 200
         # verbose for weightloading #
-        self.verbose = False
+        self.verbose = True # Verbose weight loading
         self.start_epoch = 0
         ### paths ###
         # self.weights_filename = '/work3/s204138/bach-models/PHOENIX_trained_no_temp_aug/S3D_PHOENIX-21_epochs-5.337249_loss_0.983955_WER'
-        self.backbone_weights_filename = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc' #'WLASL/epoch299.pth.tar'
+        #self.backbone_weights_filename = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc' #'WLASL/epoch299.pth.tar'
+        self.backbone_weights_filename = 'KINETICS'
         self.head_weights_filename = None
         self.save_path = '/work3/s204138/bach-models/PHOENIX_author_cfg2'
-        self.default_checkpoint = '/work3/s204138/bach-models/PHOENIX_bs6_dropout01/S3D_PHOENIX-118_epochs-16.239748_loss_0.340958_WER'
-        self.checkpoint_path =  None#'/work3/s204138/bach-models/PHOENIX_bs6_dropout01/S3D_PHOENIX-118_epochs-16.239748_loss_0.340958_WER' #'/work3/s200925/VisualEncoder/checkpoints_BS4/S3D_PHOENIX-19_epochs-1.479696_loss_0.310143_WER' # None  # if None train from scratch
-        self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual')
+        self.checkpoint_path =  None#'/work3/s204138/bach-models/PHOENIX_author_cfg2/S3D_PHOENIX-22_epochs-17.542028_loss_0.565868_WER' #'/work3/s204138/bach-models/PHOENIX_bs6_dropout01/S3D_PHOENIX-118_epochs-16.239748_loss_0.340958_WER' #'/work3/s200925/VisualEncoder/checkpoints_BS4/S3D_PHOENIX-19_epochs-1.479696_loss_0.310143_WER' # None  # if None train from scratch
+        self.gloss_vocab, self.translation_vocab = gloss_vocab, translation_vocab
         ### for data augmentation ###
         self.crop_size = 224
         ### device ###

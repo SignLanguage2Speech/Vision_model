@@ -32,7 +32,7 @@ def main():
     ### initialize configs and device ###
     dp = DataPaths()
     CFG = visual_encoder_cfg()
-    #torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = True
     
     ### initialize data ###
     train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')

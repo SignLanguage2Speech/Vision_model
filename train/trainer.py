@@ -17,12 +17,7 @@ from utils.secondary_word_error_rate import wer_list
 def get_train_modules(model, dataloader_train, CFG):
 
     ### get optimizer and scheduler ###
-    #optimizer = optim.AdamW(
-    #    model.parameters(),
-    #    lr = CFG.lr,
-    #    betas = CFG.betas,
-    #    weight_decay = CFG.weight_decay)
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         model.parameters(),
         lr = CFG.lr,
         betas = CFG.betas,
@@ -36,7 +31,7 @@ def get_train_modules(model, dataloader_train, CFG):
     if CFG.checkpoint_path is not None:
         model, optimizer, scheduler, current_epoch, \
         train_losses, val_losses, train_word_error_rates, \
-        val_word_error_rates = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
+        val_word_error_rates, _ = load_checkpoint(CFG.checkpoint_path, model, optimizer, scheduler)
         CFG.start_epoch = current_epoch
     else:
         train_losses = []
@@ -137,7 +132,6 @@ def train(model, dataloader_train, dataloader_val, CFG):
         train_losses.append(losses)
         train_word_error_rates.append(word_error_rates)
 
-        
         ### run validation loop ###
         val_loss, val_word_error_rate = validate(model, dataloader_val, criterion, decoder, CFG)
         val_losses.append(val_loss)
@@ -145,10 +139,10 @@ def train(model, dataloader_train, dataloader_val, CFG):
 
         ### Save checkpoint ###
         fname = os.path.join(CFG.save_path, f'S3D_PHOENIX-{epoch+1}_epochs-{np.mean(val_loss):.6f}_loss_{np.mean(val_word_error_rate):5f}_WER')
-        save_checkpoint(fname, model, optimizer, scheduler, epoch+1, train_losses, val_losses, train_word_error_rates, val_word_error_rates)
+        save_checkpoint(fname, model, optimizer, scheduler, epoch+1, train_losses, val_losses, train_word_error_rates, val_word_error_rates, model.CFG)
 
         ### stepping with scheduler ###
-        scheduler.step() # TODO: UNCOMMENT!!!!!!!
+        scheduler.step()
         
 
 

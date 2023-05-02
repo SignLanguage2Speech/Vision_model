@@ -10,4 +10,9 @@ def load_checkpoint(path, model, optimizer, scheduler):
     val_losses = checkpoint['val_losses']
     train_WERS = checkpoint['train_WERS']
     val_WERS = checkpoint['val_WERS']
-    return model, optimizer, scheduler, epoch, train_losses, val_losses, train_WERS, val_WERS
+
+    if "config" in checkpoint.keys():
+        config = checkpoint['config']
+        return model, optimizer, scheduler, epoch, train_losses, val_losses, train_WERS, val_WERS, config
+    else:
+        return model, optimizer, scheduler, epoch, train_losses, val_losses, train_WERS, val_WERS, None
