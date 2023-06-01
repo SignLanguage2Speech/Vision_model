@@ -3,41 +3,47 @@ import pandas as pd
 import re
 from itertools import groupby
 
-def preprocess_df(df, split, save=False, save_name = "PHOENIX_train_preprocessed.csv"):
+def preprocess_df(df, split, save=False, save_name = "PHOENIX_train_preprocessed.csv", use_synthetic_glosses=False):
     annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
     features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
-    gloss_vocab, translation_vocab = getVocab(annotations_path)
+    gloss_vocab, translation_vocab = getVocab(annotations_path, use_synthetic_glosses)
 
     print("-"*10 + f"GLOSS VOCAB SIZE {len(gloss_vocab)}" + "-" * 10)
 
     # add translation and gloss labels
-    df = getLabels(df, translation_vocab, gloss_vocab)
+    df = getLabels(df, translation_vocab, gloss_vocab,use_synthetic_glosses)
        
     if save:
         df.to_csv(os.path.join(annotations_path, save_name))
     
     return df
 
-def getLabels(df, t_vocab, g_vocab):
+def getLabels(df, t_vocab, g_vocab, use_synthetic_glosses=False):
 
     all_translations = []
     all_glosses = []
+    g_vocab_size = len(g_vocab.keys())
+    t_vocab_size = len(t_vocab.keys())
+    
     for i in range(len(df)):
         T = df.iloc[i]['translation'].split(' ')
-        G = clean_phoenix_glosses(df.iloc[i]['orth']).split(' ')
+        if not use_synthetic_glosses:
+            G = clean_phoenix_glosses(df.iloc[i]['orth']).split(' ')
+        else:
+            G = df.iloc[i]['synthetic glosses'].split(' ')
         T_labels = []
         G_labels = []
         for word in T:
             try:
                 T_labels.append(t_vocab[word])
             except KeyError:
-                T_labels.append(1086) # TODO Figure out how to handle OOV in validation & test
+                T_labels.append(t_vocab_size + 1) # TODO Figure out how to handle OOV in validation & test
         
         for gloss in G:
             try:
                 G_labels.append(g_vocab[gloss])
             except KeyError:
-                G_labels.append(1086) # TODO Figure out how to handle OOV in validation & test
+                G_labels.append(g_vocab_size + 1) # TODO Figure out how to handle OOV in validation & test
                 
         all_translations.append(T_labels)
         all_glosses.append(G_labels)
@@ -47,49 +53,24 @@ def getLabels(df, t_vocab, g_vocab):
 
     return df
 
-def getVocab(path):
-    train = pd.read_csv(os.path.join(path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
+def getVocab(path, use_synthetic_glosses=False):
+    if not use_synthetic_glosses:
+        train = pd.read_csv(os.path.join(path, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
+        glosses = list(clean_phoenix_glosses(train.iloc[i]['orth']) for i in range(len(train)))
+    else:
+        train = pd.read_csv(os.path.join(path, 'PHOENIX-2014-T.train.corpus.synthetic.glosses.csv'))
+        glosses = list([train.iloc[i]['synthetic glosses'] for i in range(len(train))])
+    
     chars = '?.,!_+'
-
     # get vocabulary for translations and glosses for the train dataset
-    glosses = list(clean_phoenix_glosses(train.iloc[i]['orth']) for i in range(len(train))) #+ list(test['orth']) + list(val['orth'])
     glosses = list(sorted(set([word for sent in glosses for word in sent.replace(chars,'').split(' ')])))
 
-    translations = list(train['translation']) #+ list(test['translation']) + list(val['translation'])
+    translations = list(train['translation'])
     translations = list(sorted(set([word for sent in translations for word in sent.replace(chars,'').split(' ')])))
     
     gloss_vocab = {word: glosses.index(word)+1 for word in glosses}
     translation_vocab = {word: translations.index(word)+1 for word in translations}
     return gloss_vocab, translation_vocab
-
-def addLengths(df, features_path, cutoff=330):
-  video_names = list(df['name'])
-  lengths = []
-  for name in video_names:
-    length = len(os.listdir(os.path.join(features_path, 'train', name)))
-    lengths.append(length)
-  
-  df['video_length'] = lengths
-  df = df[df['video_length'] < cutoff]
-  return df.reset_index()
-
-def groupByBin(df):
-  ### calculate bins
-  min_val = min(df['video_length'])
-  max_val = max(df['video_length'])
-  bins = [min_val]
-  val = min_val
-
-  while val < max_val:
-    val = int(val*1.25)
-    bins.append(val)
-
-  dataframes = []
-  for i in range(len(bins)-1):
-    df_new = df[(df['video_length'] >= bins[i]) & (df['video_length'] < bins[i+1])]
-    dataframes.append(df_new)
-
-  return dataframes
 
 
 def clean_phoenix_glosses(prediction):
@@ -127,3 +108,36 @@ def clean_phoenix_glosses(prediction):
     prediction = prediction.strip()
 
     return prediction
+
+
+""" ### Deprecated! ###
+def addLengths(df, features_path, cutoff=330):
+  video_names = list(df['name'])
+  lengths = []
+  for name in video_names:
+    length = len(os.listdir(os.path.join(features_path, 'train', name)))
+    lengths.append(length)
+  
+  df['video_length'] = lengths
+  df = df[df['video_length'] < cutoff]
+  return df.reset_index()
+
+def groupByBin(df):
+  ### calculate bins
+  min_val = min(df['video_length'])
+  max_val = max(df['video_length'])
+  bins = [min_val]
+  val = min_val
+
+  while val < max_val:
+    val = int(val*1.25)
+    bins.append(val)
+
+  dataframes = []
+  for i in range(len(bins)-1):
+    df_new = df[(df['video_length'] >= bins[i]) & (df['video_length'] < bins[i+1])]
+    dataframes.append(df_new)
+
+  return dataframes
+
+"""

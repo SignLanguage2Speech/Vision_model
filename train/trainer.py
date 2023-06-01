@@ -142,7 +142,7 @@ def train(model, dataloader_train, dataloader_val, CFG):
         save_checkpoint(fname, model, optimizer, scheduler, epoch+1, train_losses, val_losses, train_word_error_rates, val_word_error_rates, model.CFG)
 
         ### stepping with scheduler ###
-        scheduler.step()
+        #scheduler.step() # NOTE: Outcommented due to continued training! 
         
 
 

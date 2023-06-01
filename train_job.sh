@@ -9,9 +9,9 @@
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 20:00
+#BSUB -W 12:00
 # request 32GB of system-memory
-#BSUB -R "rusage[mem=70GB]"
+#BSUB -R "rusage[mem=60GB]"
 #BSUB -R "select[gpu80gb]"
 
 ### -- set the email address --

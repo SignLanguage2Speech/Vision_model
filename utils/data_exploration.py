@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-
+import pdb
 annotations_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual'
 features_path = '/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/features/fullFrame-210x260px'
 
@@ -19,7 +19,7 @@ chars = '?.,!-_+'
 annotations = list(train['orth'])# + list(test['orth']) + list(val['orth'])
 annotations = list(sorted(set([word for sent in annotations for word in sent.replace(chars,'').split(' ')])))
 print(f"Train vocab size: {len(annotations)}")
-
+pdb.set_trace()
 #### Data preprocessing ####
 full_df = pd.concat([train, test, val])
 
