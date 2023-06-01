@@ -62,7 +62,7 @@ def get_train_modules(model, dataloader_train, CFG):
 
 
 def train(model, dataloader_train, dataloader_val, CFG):
-
+    
     ### printing training ###
     print("-"*10 + "STARTING TRAINING OF BS" + str(CFG.batch_size) + "-"*10)
     
@@ -142,7 +142,7 @@ def train(model, dataloader_train, dataloader_val, CFG):
         save_checkpoint(fname, model, optimizer, scheduler, epoch+1, train_losses, val_losses, train_word_error_rates, val_word_error_rates, model.CFG)
 
         ### stepping with scheduler ###
-        #scheduler.step() # NOTE: Outcommented due to continued training! 
+        scheduler.step()
         
 
 

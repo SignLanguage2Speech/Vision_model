@@ -37,13 +37,13 @@ def main():
     ### initialize data ###
     if not CFG.use_synthetic_glosses:
        
-      train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')[:5]
-      val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')[:5]
-      test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')[:5]
+      train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.csv'), delimiter = '|')
+      val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.csv'), delimiter = '|')
+      test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.csv'), delimiter = '|')
     else:
-      train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.synthetic.glosses.csv'))[:5]
-      val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.synthetic.glosses.csv'))[:5]
-      test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.synthetic.glosses.csv'))[:5]
+      train_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.train.corpus.synthetic.glosses.csv'))
+      val_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.dev.corpus.synthetic.glosses.csv'))
+      test_df = pd.read_csv(os.path.join(dp.phoenix_labels, 'PHOENIX-2014-T.test.corpus.synthetic.glosses.csv'))
 
     ### initialize data ###
     PhoenixTrain = PhoenixDataset(train_df, dp.phoenix_videos, vocab_size=CFG.VOCAB_SIZE, split='train', use_synthetic_glosses=CFG.use_synthetic_glosses)
@@ -75,6 +75,7 @@ def main():
     model = VisualEncoder(CFG).to(CFG.device)
     
     ### train the model ###
+    #torch.backends.cudnn.enabled = False
     train(model, dataloader_train, dataloader_val, CFG)
 
 

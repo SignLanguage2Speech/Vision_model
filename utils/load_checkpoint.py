@@ -1,6 +1,7 @@
 import torch
 
 def load_checkpoint(path, model, optimizer, scheduler):
+    
     checkpoint = torch.load(path)
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     model.load_state_dict(checkpoint['model_state_dict'])
