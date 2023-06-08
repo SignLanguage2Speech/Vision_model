@@ -83,7 +83,7 @@ model:
 ### Config for training on Phoenix
 class cfg:
     def __init__(self) -> None:
-        self.n_classes = 2391 + 1 # +1 for blank token # 1085 
+        self.n_classes = 1085 + 1 # +1 for blank token # 2391 
         self.VOCAB_SIZE = self.n_classes - 1
         # S3D backbone
         self.use_block = 4 # use everything except lass block
@@ -99,26 +99,24 @@ class cfg:
         self.betas = (0.9, 0.998)
         self.weight_decay = 1.0e-3
         self.lr = 1.0e-3
-        self.batch_size = 1
-        self.n_epochs = 150
+        self.batch_size = 6
+        self.n_epochs = 120
         self.num_workers = 8
-        self.train_print_freq = 10
-        self.val_print_freq = 50
+        self.train_print_freq = 500
+        self.val_print_freq = 100
         # verbose for weightloading #
         self.verbose = True # Verbose weight loading
         self.start_epoch = 0
         ### paths ###
-        # self.weights_filename = '/work3/s204138/bach-models/PHOENIX_trained_no_temp_aug/S3D_PHOENIX-21_epochs-5.337249_loss_0.983955_WER'
-        #self.backbone_weights_filename = '/work3/s204138/bach-models/trained_models/S3D_WLASL-91_epochs-3.358131_loss_0.300306_acc' #'WLASL/epoch299.pth.tar'
-        self.backbone_weights_filename = 'KINETICS'
+        self.backbone_weights_filename = None 
         self.head_weights_filename = None
-        self.save_path = '/work3/s204138/bach-models/AblationS2G'
-        self.checkpoint_path = None #'/work3/s204138/bach-models/Kinetics_CTC_training/S3D_PHOENIX-100_epochs-12.429813_loss_0.229911_WER' 
+        self.save_path = None #'/work3/s204138/bach-models/AblationS2G'
+        self.checkpoint_path = '/work3/s204138/bach-models/Kinetics_CTC_training/S3D_PHOENIX-100_epochs-12.429813_loss_0.229911_WER'
         ### for data augmentation ###
         self.crop_size = 224
         ### device ###
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.use_synthetic_glosses = True
+        self.use_synthetic_glosses = False
         self.gloss_vocab, self.translation_vocab = getVocab('/work3/s204138/bach-data/PHOENIX/PHOENIX-2014-T-release-v3/PHOENIX-2014-T/annotations/manual', 
                                                             use_synthetic_glosses=self.use_synthetic_glosses)
         

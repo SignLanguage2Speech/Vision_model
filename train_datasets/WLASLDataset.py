@@ -131,7 +131,7 @@ class WLASLDataset(data.Dataset):
     self.seq_len = seq_len
     self.DataAugmentation = DataAugmentations()
     self.train = train
-    self.vocab_size = len(set(self.df['gloss']))
+    self.vocab_size = 2000 #len(set(self.df['gloss']))
 
   def __getitem__(self, idx):
     

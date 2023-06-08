@@ -29,8 +29,9 @@ class S3D(nn.Module):
 
         # if vanilla S3D is being trained
         if use_block >= 5:
-            self.fc = nn.Sequential(nn.Conv3d(1024, 400, kernel_size=1, stride=1, bias=True),) # for Kinetics
-            self.final_fc = nn.Sequential(nn.Linear(1024, 2000)) # for WLASL
+            #self.fc = nn.Sequential(nn.Conv3d(1024, 400, kernel_size=1, stride=1, bias=True),) # for Kinetics
+            self.fc = nn.Sequential(nn.Conv3d(1024, 2000, kernel_size=1, stride=1, bias=True),) # for WLASL
+            #self.final_fc = nn.Sequential(nn.Linear(1024, 2000)) # for WLASL
     
     def forward(self, x):
         y = self.base(x)

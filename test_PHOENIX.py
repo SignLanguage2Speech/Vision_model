@@ -115,13 +115,12 @@ dataloader_test = DataLoader(
     shuffle=False,
     num_workers=CFG.num_workers)
 
-print("HII")
 ### initialize model ###
 model = VisualEncoder(CFG).to(CFG.device)
 
 optimizer, criterion, scheduler, \
     decoder, train_losses, train_word_error_rates, \
     val_losses, val_word_error_rates = get_train_modules(model, dataloader_train, CFG)
-print("HII")
-### validate the model ###
+
+### test the model ###
 validate(model, dataloader_test, criterion, decoder, CFG)
